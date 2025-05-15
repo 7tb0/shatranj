@@ -3,25 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Custom Chess Variant</title>
-  <style>
-    body { display: flex; flex-direction: column; align-items: center; margin: 20px; font-family: sans-serif; }
-    #boardContainer { position: relative; display: flex; flex-direction: column; align-items: center; }
-    #controls { margin-top: 10px; display: flex; flex-direction: column; align-items: center; }
-    #controls button { width: 120px; padding: 10px; margin: 5px 0; border: none; cursor: pointer; font-size: 14px; transition: background 0.3s; }
-    #playButton { background: green; color: white; border-radius: 8px; }
-    #controls button:hover { background: #ddd; }
-    #settingsPanel, #playPanel, #palette { display: none; margin-bottom: 10px; padding: 10px; border: 1px solid #666; background: #f9f9f9; }
-    #settingsPanel label, #playPanel label { display: block; margin: 5px 0; }
-    #timers { display: none; margin-top: 10px; width: 100%; display: flex; justify-content: space-between; font-size: 16px; }
-    #timers div { padding: 5px 10px; background: #eee; border: 1px solid #ccc; border-radius: 4px; }
-    canvas { border: 1px solid #000; cursor: pointer; }
-    #palette { display: flex; flex-wrap: wrap; max-width: 300px; margin-top: 10px; }
-    #palette button { margin: 4px; padding: 0; border: 2px solid transparent; cursor: pointer; background: none; }
-    #palette button.selected { border-color: red; }
-    #palette img { width: 40px; height: 40px; }
-    #eraseButton { margin: 4px; background: #f88; color: white; }
-    #message { margin-top: 10px; font-weight: bold; }
-  </style>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div id="boardContainer">
@@ -39,166 +21,13 @@
     <button id="playButton">Play</button>
   </div>
 
-  <div id="settingsPanel">
-    <h3>Settings</h3>
-    <label>Theme:
-      <select id="themeSelect">
-        <option value="classic">Classic</option>
-        <option value="wood">Wood</option>
-        <option value="dark">Dark</option>
-        <option value="sand">Sand</option>
-        <option value="ice">Ice</option>
-      </select>
-    </label>
-    <label><input type="checkbox" id="guiderToggle"> Show Move Guider</label>
-    <button id="resetButton">Reset Board</button>
-    <h4>Piece Images (optional)</h4>
-    <div id="imageInputs"></div>
-  </div>
+  <!-- Settings and play panels will be injected by settings.js -->
+  <div id="settingsPanel"></div>
+  <div id="playPanel"></div>
 
-  <div id="playPanel">
-    <h3>Game Options</h3>
-    <label>Play Mode:
-      <select id="playModeSelect">
-        <option value="free">Free Mode</option>
-        <option value="custom">Custom Mode</option>
-        <option value="play">Play Mode</option>
-        <option value="two">2 Players Mode</option>
-      </select>
-    </label>
-    <label>Timer:
-      <select id="timerSelect">
-        <option value="none">No Timer</option>
-        <option value="5">5 Minutes</option>
-        <option value="10">10 Minutes</option>
-        <option value="open">Open</option>
-      </select>
-    </label>
-    <label><input type="checkbox" id="incrementToggle"> Add 10s increment each move</label>
-    <button id="confirmSettings">Confirm</button>
-  </div>
-
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const canvas = document.getElementById('board');
-      const ctx = canvas.getContext('2d');
-      const messageDiv = document.getElementById('message');
-      const dpr = window.devicePixelRatio || 1;
-      const squareSize = 60, boardSize = 8;
-      canvas.style.width = boardSize * squareSize + 'px';
-      canvas.style.height = boardSize * squareSize + 'px';
-      canvas.width = boardSize * squareSize * dpr;
-      canvas.height = boardSize * squareSize * dpr;
-      ctx.scale(dpr, dpr);
-
-      let board = [];
-      let images = {};
-      let selectedSquare = null;
-      let selectedPieceType = null;
-      let turn = 'w';
-      let whiteTime = 0;
-      let blackTime = 0;
-      let timerInterval = null;
-      let gameOver = false;
-      const config = { theme: 'classic', playMode: 'free', timer: 'none', increment: false, showGuider: false };
-      const themes = {
-        classic: { light: '#f0d9b5', dark: '#b58863' },
-        wood:    { light: '#d2a679', dark: '#8b5a2b' },
-        dark:    { light: '#4f5b75', dark: '#2a2e38' },
-        sand:    { light: '#d8c3a5', dark: '#b0906f' },
-        ice:     { light: '#e3f2fd', dark: '#90a4ae' }
-      };
-      const pieceKeys = ['R','N','E','F','K','P'];
-
-      // Preload assets
-      (function preloadAssets() {
-        // Load images from same directory as index.html
-        pieceKeys.forEach(pt => ['w','b'].forEach(color => {
-          const key = color + pt;
-          const img = new Image();
-          img.onload = drawBoard;
-          img.onerror = () => {
-            // If not found in root, try assets folder as fallback
-            img.src = 'assets/' + key + '.png';
-          };
-          img.src = key + '.png';
-          images[key] = img;
-        }));
-      })();
-
-      function initBoard() {
-        board = Array.from({ length: boardSize }, () => Array(boardSize).fill(null));
-        gameOver = false;
-        messageDiv.textContent = '';
-        if (config.playMode !== 'custom') {
-          const backRank = ['R','N','E','F','K','E','N','R'];
-          for (let x = 0; x < boardSize; x++) {
-            board[0][x] = 'w' + backRank[x]; board[1][x] = 'wP';
-            board[6][x] = 'bP'; board[7][x] = 'b' + backRank[x];
-          }
-        }
-        whiteTime = config.timer === 'open' ? 0 : parseInt(config.timer,10)*60;
-        blackTime = whiteTime;
-        updateTimers();
-        drawBoard();
-      }
-
-      function drawBoard() {
-        const { light, dark } = themes[config.theme];
-        ctx.clearRect(0,0,boardSize*squareSize,boardSize*squareSize);
-        // squares
-        for (let y=0; y<boardSize; y++) {
-          for (let x=0; x<boardSize; x++) {
-            ctx.fillStyle = (x+y)%2===0 ? light : dark;
-            ctx.fillRect(x*squareSize, y*squareSize, squareSize, squareSize);
-          }
-        }
-        // guider
-        if (selectedSquare && config.showGuider && config.playMode==='play') {
-          const [sx,sy] = selectedSquare;
-          getMoves(sx,sy).forEach(([mx,my])=>{
-            ctx.fillStyle='rgba(0,255,0,0.3)';
-            ctx.fillRect(mx*squareSize, my*squareSize, squareSize, squareSize);
-          });
-        }
-        // selected border
-        if (selectedSquare) {
-          const [sx,sy] = selectedSquare;
-          ctx.strokeStyle='red'; ctx.lineWidth=2;
-          ctx.strokeRect(sx*squareSize+2, sy*squareSize+2, squareSize-4, squareSize-4);
-        }
-        // pieces
-        ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='20px sans-serif';
-        for (let y=0; y<boardSize; y++) {
-          for (let x=0; x<boardSize; x++) {
-            const key=board[y][x]; if(!key) continue;
-            const img=images[key];
-            if (img.complete && img.naturalWidth) {
-              ctx.drawImage(img, x*squareSize, y*squareSize, squareSize, squareSize);
-            } else {
-              ctx.fillStyle='black';
-              ctx.fillText(key, x*squareSize+squareSize/2, y*squareSize+squareSize/2);
-            }
-          }
-        }
-      }
-
-      function isValid(x,y) {return x>=0&&x<boardSize&&y>=0&&y<boardSize;}
-      function inCheck(color){const opp=color==='w'?'b':'w';let k;board.forEach((r,y)=>r.forEach((c,x)=>c===color+'K'&&(k=[x,y])));for(let y=0;y<boardSize;y++)for(let x=0;x<boardSize;x++){const p=board[y][x];if(p&&p[0]===opp&&getMoves(x,y,true).some(m=>m[0]===k[0]&&m[1]===k[1]))return true;}return false;}
-      function isCheckmate(color){if(!inCheck(color))return false;for(let y=0;y<boardSize;y++)for(let x=0;x<boardSize;x++){const p=board[y][x];if(!p||p[0]!==color)continue;for(const[mx,my]of getMoves(x,y)){const b=board[my][mx];board[my][mx]=board[y][x];board[y][x]=null;if(!inCheck(color))return false;board[y][x]=board[my][mx];board[my][mx]=b;}}return true;}
-      function getMoves(x,y,ignoreCheck){if(!isValid(x,y)||!board[y][x])return[];const p=board[y][x],c=p[0],t=p[1],opp=c==='w'?'b':'w';let m=[];let type=(t==='P'&&(y===0||y===boardSize-1))?'F':t; if(type==='R')[[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy])=>{for(let i=1;i<boardSize;i++){const nx=x+dx*i,ny=y+dy*i;if(!isValid(nx,ny))break;const o=board[ny][nx];if(!o)m.push([nx,ny]);else{o[0]===opp&&m.push([nx,ny]);break;}}});const defs={E:{dirs:[[1,1],[1,-1],[-1,1],[-1,-1]],step:2},F:{dirs:[[1,1],[1,-1],[-1,1],[-1,-1]],step:1},N:{dirs:[[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]],step:1},K:{dirs:[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]],step:1}};defs[type]&&defs[type].dirs.forEach(([dx,dy])=>{const nx=x+dx*defs[type].step,ny=y+dy*defs[type].step;if(isValid(nx,ny)){const o=board[ny][nx];(!o||o[0]===opp)&&m.push([nx,ny]);}});if(t==='P'){const dir=c==='w'?1:-1;const nx=x,ny=y+dir;isValid(nx,ny)&&!board[ny][nx]&&m.push([nx,ny]);[[1,dir],[-1,dir]].forEach(([dx,dy])=>{const cx=x+dx,cy=y+dy;isValid(cx,cy)&&board[cy][cx]&&board[cy][cx][0]===opp&&m.push([cx,cy]);});}if(!ignoreCheck&&config.playMode==='play'){m=m.filter(([mx,my])=>{const b=board[my][mx];board[my][mx]=board[y][x];board[y][x]=null;const bad=inCheck(c);board[y][x]=board[my][mx];board[my][mx]=b;return!bad;});}return m;}
-      function updateTimers(){const wt=document.getElementById('whiteTimer'),bt=document.getElementById('blackTimer');if(config.timer==='none'){document.getElementById('timers').style.display='none';return;}document.getElementById('timers').style.display='flex';wt.textContent='White: '+formatTime(whiteTime);bt.textContent='Black: '+formatTime(blackTime);} function formatTime(s){const m=Math.floor(s/60),sec=s%60;return m.toString().padStart(2,'0')+':'+sec.toString().padStart(2,'0');}
-      function setupPalette(){const pal=document.getElementById('palette');pal.innerHTML='';const erase=document.createElement('button');erase.id='eraseButton';erase.textContent='Erase';erase.onclick=()=>{selectedPieceType=null;updatePalette();};pal.appendChild(erase);['w','b'].forEach(color=>pieceKeys.forEach(pt=>{const key=color+pt;const btn=document.createElement('button');btn.dataset.key=key;const img=document.createElement('img');img.src=images[key]?.src||'';btn.appendChild(img);btn.onclick=()=>{selectedPieceType=key;updatePalette();};pal.appendChild(btn);}));}function updatePalette(){document.querySelectorAll('#palette button').forEach(btn=>btn.classList.toggle('selected',btn.dataset.key===selectedPieceType));}
-      document.getElementById('settingsButton').onclick=()=>{const p=document.getElementById('settingsPanel');p.style.display=p.style.display==='block'?'none':'block';};
-      document.getElementById('playButton').onclick=()=>{const p=document.getElementById('playPanel');p.style.display=p.style.display==='block'?'none':'block';};
-      document.getElementById('confirmSettings').onclick=()=>{config.playMode=document.getElementById('playModeSelect').value;config.timer=document.getElementById('timerSelect').value;config.increment=document.getElementById('incrementToggle').checked;config.showGuider=document.getElementById('guiderToggle').checked;document.getElementById('playPanel').style.display='none';clearInterval(timerInterval);setupPalette();document.getElementById('palette').style.display=config.playMode==='custom'?'flex':'none';initBoard();if(config.timer!=='none'&&config.timer!=='open')timerInterval=setInterval(()=>{if(turn==='w')whiteTime--;else blackTime--;updateTimers();},1000);};
-      document.getElementById('resetButton').onclick=()=>{initBoard();};
-      document.getElementById('themeSelect').addEventListener('change',e=>{config.theme=e.target.value;drawBoard();});
-
-      canvas.onclick=e=>{const r=canvas.getBoundingClientRect(),x=Math.floor((e.clientX-r.left)/squareSize),y=Math.floor((e.clientY-r.top)/squareSize);if(!isValid(x,y)||gameOver)return;if(config.playMode==='custom'){board[y][x]=selectedPieceType;drawBoard();return;}if(!selectedSquare){const p=board[y][x];if(p&&(config.playMode==='free'||p[0]===turn)){selectedSquare=[x,y];drawBoard();}}else{const[sx,sy]=selectedSquare;const valid=config.playMode==='free'||getMoves(sx,sy).some(m=>m[0]===x&&m[1]===y);if(valid){board[y][x]=board[sy][sx];board[sy][sx]=null;if(config.increment){if(turn==='w')whiteTime+=10;else blackTime+=10;}if(config.playMode==='play'||config.playMode==='two'){if(inCheck(turn==='w'?'b':'w'))messageDiv.textContent='Check!';if(isCheckmate(turn==='w'?'b':'w')){gameOver=true;messageDiv.textContent=(turn==='w'?'Black':'White')+' is checkmated!';}turn=turn==='w'?'b':'w';}updateTimers();}selectedSquare=null;drawBoard();}};
-      const imgContainer=document.getElementById('imageInputs');imgContainer.innerHTML='';['w','b'].forEach(color=>pieceKeys.forEach(pt=>{const key=color+pt;const label=document.createElement('label');label.textContent=key+': ';const input=document.createElement('input');input.type='file';input.accept='image/*';input.onchange=ev=>{const file=ev.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=()=>{const img=new Image();img.src=reader.result;img.onload=()=>{images[key]=img;setupPalette();drawBoard();};images[key]=img;};reader.readAsDataURL(file);};label.appendChild(input);imgContainer.appendChild(label);}));
-      setupPalette();document.getElementById('palette').style.display='none';initBoard();
-    });
-  </script>
+  <!-- Load settings manager first -->
+  <script src="settings.js"></script>
+  <!-- Main game logic -->
+  <script src="main.js"></script>
 </body>
 </html>
