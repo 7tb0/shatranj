@@ -91,188 +91,109 @@
       canvas.height = boardSize * squareSize * dpr;
       ctx.scale(dpr, dpr);
 
-      let board = [], images = {}, selectedSquare = null, selectedPieceType = null;
-      let turn = 'w', whiteTime = 0, blackTime = 0, timerInterval = null, gameOver = false;
+      let board = [];
+      let images = {};
+      let selectedSquare = null;
+      let selectedPieceType = null;
+      let turn = 'w';
+      let whiteTime = 0;
+      let blackTime = 0;
+      let timerInterval = null;
+      let gameOver = false;
       const config = { theme: 'classic', playMode: 'free', timer: 'none', increment: false, showGuider: false };
-      const themes = { classic:{light:'#f0d9b5',dark:'#b58863'}, wood:{light:'#d2a679',dark:'#8b5a2b'}, dark:{light:'#4f5b75',dark:'#2a2e38'}, sand:{light:'#d8c3a5',dark:'#b0906f'}, ice:{light:'#e3f2fd',dark:'#90a4ae'} };
+      const themes = {
+        classic: { light: '#f0d9b5', dark: '#b58863' },
+        wood:    { light: '#d2a679', dark: '#8b5a2b' },
+        dark:    { light: '#4f5b75', dark: '#2a2e38' },
+        sand:    { light: '#d8c3a5', dark: '#b0906f' },
+        ice:     { light: '#e3f2fd', dark: '#90a4ae' }
+      };
       const pieceKeys = ['R','N','E','F','K','P'];
 
+      // Preload assets
       (function preloadAssets() {
-        const assetsPath = '/assets/';
-        ['wP','wR','wN','wE','wF','wK','bP','bR','bN','bE','bF','bK'].forEach(key => {
-          const img = new Image(); img.onload = drawBoard; img.src = `${assetsPath}${key}.png`; images[key] = img;
-        });
+        const assetsPath = 'assets/';
+        pieceKeys.forEach(pt => ['w','b'].forEach(color => {
+          const key = color + pt;
+          const img = new Image();
+          img.onload = drawBoard;
+          img.src = assetsPath + key + '.png';
+          images[key] = img;
+        }));
       })();
 
       function initBoard() {
         board = Array.from({ length: boardSize }, () => Array(boardSize).fill(null));
-        gameOver = false; messageDiv.textContent = '';
+        gameOver = false;
+        messageDiv.textContent = '';
         if (config.playMode !== 'custom') {
-          const back = ['R','N','E','F','K','E','N','R'];
+          const backRank = ['R','N','E','F','K','E','N','R'];
           for (let x = 0; x < boardSize; x++) {
-            board[0][x] = 'w' + back[x]; board[1][x] = 'wP';
-            board[6][x] = 'bP'; board[7][x] = 'b' + back[x];
+            board[0][x] = 'w' + backRank[x]; board[1][x] = 'wP';
+            board[6][x] = 'bP'; board[7][x] = 'b' + backRank[x];
           }
         }
-        whiteTime = config.timer==='open'?0:parseInt(config.timer,10)*60;
+        whiteTime = config.timer === 'open' ? 0 : parseInt(config.timer,10)*60;
         blackTime = whiteTime;
-        updateTimers(); drawBoard();
+        updateTimers();
+        drawBoard();
       }
 
       function drawBoard() {
         const { light, dark } = themes[config.theme];
-        ctx.clearRect(0, 0, boardSize*squareSize, boardSize*squareSize);
-        for (let y = 0; y < boardSize; y++) for (let x = 0; x < boardSize; x++) {
-          ctx.fillStyle = (x+y)%2===0 ? light : dark;
-          ctx.fillRect(x*squareSize, y*squareSize, squareSize, squareSize);
+        ctx.clearRect(0,0,boardSize*squareSize,boardSize*squareSize);
+        // squares
+        for (let y=0; y<boardSize; y++) {
+          for (let x=0; x<boardSize; x++) {
+            ctx.fillStyle = (x+y)%2===0 ? light : dark;
+            ctx.fillRect(x*squareSize, y*squareSize, squareSize, squareSize);
+          }
         }
+        // guider
         if (selectedSquare && config.showGuider && config.playMode==='play') {
           const [sx,sy] = selectedSquare;
-          const moves = getMoves(sx,sy);
-          ctx.fillStyle = 'rgba(0,255,0,0.3)';
-          moves.forEach(([mx,my]) => ctx.fillRect(mx*squareSize, my*squareSize, squareSize, squareSize));
-        }
-        if (selectedSquare) {
-          const [sx,sy] = selectedSquare;
-          ctx.strokeStyle = 'red'; ctx.lineWidth = 2;
-          ctx.strokeRect(sx*squareSize+2, sy*squareSize+2, squareSize-4, squareSize-4);
-        }
-        for (let y=0; y<boardSize; y++) for (let x=0; x<boardSize; x++) {
-          const key = board[y][x]; if (!key) continue;
-          const img = images[key];
-          if (img.complete && img.naturalWidth) {
-            ctx.drawImage(img, x*squareSize, y*squareSize, squareSize, squareSize);
-          }
-        }
-      }
-
-      function isValid(x,y){return x>=0&&x<boardSize&&y>=0&&y<boardSize;}
-      function inCheck(color) {
-        const opp = color==='w'?'b':'w'; let kpos;
-        board.forEach((row,y) => row.forEach((c,x) => { if (c===color+'K') kpos=[x,y]; }));
-        for (let y=0; y<boardSize; y++) for (let x=0; x<boardSize; x++) {
-          const p = board[y][x];
-          if (p && p[0]===opp) {
-            if (getMoves(x,y,true).some(m => m[0]===kpos[0] && m[1]===kpos[1])) return true;
-          }
-        }
-        return false;
-      }
-      function isCheckmate(color) {
-        if (!inCheck(color)) return false;
-        for (let y=0; y<boardSize; y++) for (let x=0; x<boardSize; x++) {
-          const p = board[y][x]; if (!p || p[0]!==color) continue;
-          const moves = getMoves(x,y);
-          for (const [mx,my] of moves) {
-            const backup = board[my][mx]; board[my][mx] = board[y][x]; board[y][x] = null;
-            const still = inCheck(color);
-            board[y][x] = board[my][mx]; board[my][mx] = backup;
-            if (!still) return false;
-          }
-        }
-        return true;
-      }
-
-      function getMoves(x,y,ignoreCheck) {
-        if (!isValid(x,y) || !board[y][x]) return [];
-        const p = board[y][x], c = p[0], t = p[1], opp = c==='w'?'b':'w';
-        let m = [];
-        let type = t;
-        if (t==='P' && (y===0 || y===boardSize-1)) type='F';
-        if (type==='R')    /* rook logic */ [];
-        const defs = {/* bishop, knight, ferz, king */};
-        if (defs[type])    /* diagonal/knight logic */;
-        if (t==='P')       /* pawn logic */;
-        if (!ignoreCheck && config.playMode==='play') {
-          m = m.filter(([mx,my]) => {
-            const backup = board[my][mx]; board[my][mx] = board[y][x]; board[y][x] = null;
-            const bad = inCheck(c);
-            board[y][x] = board[my][mx]; board[my][mx] = backup;
-            return !bad;
+          getMoves(sx,sy).forEach(([mx,my])=>{
+            ctx.fillStyle='rgba(0,255,0,0.3)';
+            ctx.fillRect(mx*squareSize, my*squareSize, squareSize, squareSize);
           });
         }
-        return m;
-      }
-
-      function updateTimers() {
-        const wt = document.getElementById('whiteTimer'), bt = document.getElementById('blackTimer');
-        if (config.timer==='none') { document.getElementById('timers').style.display='none'; return; }
-        document.getElementById('timers').style.display='flex';
-        wt.textContent = 'White: ' + formatTime(whiteTime);
-        bt.textContent = 'Black: ' + formatTime(blackTime);
-      }
-      function formatTime(s) { const m = Math.floor(s/60), sec = s%60; return m.toString().padStart(2,'0') + ':' + sec.toString().padStart(2,'0'); }
-
-      function setupPalette() {
-        const pal = document.getElementById('palette'); pal.innerHTML = '';
-        const erase = document.createElement('button'); erase.id = 'eraseButton'; erase.textContent = 'Erase';
-        erase.onclick = () => { selectedPieceType = null; updatePalette(); };
-        pal.appendChild(erase);
-        ['w','b'].forEach(color => pieceKeys.forEach(pt => {
-          const key = color + pt;
-          const btn = document.createElement('button'); btn.dataset.key = key;
-          const img = document.createElement('img'); img.src = images[key]?.src || '';
-          btn.appendChild(img);
-          btn.onclick = () => { selectedPieceType = key; updatePalette(); };
-          pal.appendChild(btn);
-        }));
-      }
-      function updatePalette() {
-        document.querySelectorAll('#palette button').forEach(btn => {
-          btn.classList.toggle('selected', btn.dataset.key === selectedPieceType);
-        });
-      }
-
-      // Event handlers
-      document.getElementById('settingsButton').onclick = () => { const p = document.getElementById('settingsPanel'); p.style.display = p.style.display==='block'?'none':'block'; };
-      document.getElementById('playButton').onclick     = () => { const p = document.getElementById('playPanel'); p.style.display = p.style.display==='block'?'none':'block'; };
-      document.getElementById('confirmSettings').onclick = () => {
-        config.playMode   = document.getElementById('playModeSelect').value;
-        config.timer      = document.getElementById('timerSelect').value;
-        config.increment  = document.getElementById('incrementToggle').checked;
-        config.showGuider = document.getElementById('guiderToggle').checked;
-        document.getElementById('playPanel').style.display='none'; clearInterval(timerInterval);
-        setupPalette(); document.getElementById('palette').style.display = config.playMode==='custom'?'flex':'none';
-        initBoard(); if (config.timer!=='none'&&config.timer!=='open') timerInterval = setInterval(() => { if (turn==='w') whiteTime--; else blackTime--; updateTimers(); },1000);
-      };
-      document.getElementById('resetButton').onclick = () => { initBoard(); };
-      document.getElementById('themeSelect').addEventListener('change', e => { config.theme = e.target.value; drawBoard(); });
-
-      canvas.onclick = e => {
-        const r = canvas.getBoundingClientRect(); const x = Math.floor((e.clientX - r.left)/squareSize), y = Math.floor((e.clientY - r.top)/squareSize);
-        if (!isValid(x,y) || gameOver) return;
-        if (config.playMode==='custom') { board[y][x] = selectedPieceType; drawBoard(); return; }
-        if (!selectedSquare) {
-          const p = board[y][x]; if (p && (config.playMode==='free' || p[0]===turn)) { selectedSquare=[x,y]; drawBoard(); }
-        } else {
-          const [sx,sy] = selectedSquare; const valid = (config.playMode==='free') || getMoves(sx,sy).some(m => m[0]===x && m[1]===y);
-          if (valid) {
-            board[y][x] = board[sy][sx]; board[sy][sx] = null;
-            if (config.increment) { if (turn==='w') whiteTime += 10; else blackTime += 10; }
-            if (config.playMode==='play' || config.playMode==='two') {
-              // Check for check
-              if (inCheck(turn==='w'?'b':'w')) messageDiv.textContent = 'Check!';
-              // Checkmate
-              if (isCheckmate(turn==='w'?'b':'w')) { gameOver = true; messageDiv.textContent = (turn==='w'?'Black':'White') + ' is checkmated!'; }
-              turn = turn==='w'?'b':'w';
-            }
-            updateTimers();
-          }
-          selectedSquare = null; drawBoard();
+        // selected border
+        if (selectedSquare) {
+          const [sx,sy] = selectedSquare;
+          ctx.strokeStyle='red'; ctx.lineWidth=2;
+          ctx.strokeRect(sx*squareSize+2, sy*squareSize+2, squareSize-4, squareSize-4);
         }
-      };
+        // pieces
+        ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='20px sans-serif';
+        for (let y=0; y<boardSize; y++) {
+          for (let x=0; x<boardSize; x++) {
+            const key=board[y][x]; if(!key) continue;
+            const img=images[key];
+            if (img.complete && img.naturalWidth) {
+              ctx.drawImage(img, x*squareSize, y*squareSize, squareSize, squareSize);
+            } else {
+              ctx.fillStyle='black';
+              ctx.fillText(key, x*squareSize+squareSize/2, y*squareSize+squareSize/2);
+            }
+          }
+        }
+      }
 
-      // Image inputs
-      const imgContainer = document.getElementById('imageInputs'); imgContainer.innerHTML = '';
-      ['w','b'].forEach(color => pieceKeys.forEach(pt => {
-        const key = color + pt;
-        const label = document.createElement('label'); label.textContent = key + ': ';
-        const input = document.createElement('input'); input.type='file'; input.accept='image/*';
-        input.onchange = ev => { const file = ev.target.files[0]; if (!file) return; const reader=new FileReader(); reader.onload = () => { const img=new Image(); img.src=reader.result; img.onload = () => { images[key]=img; setupPalette(); drawBoard(); }; images[key]=img; }; reader.readAsDataURL(file); };
-        label.appendChild(input); imgContainer.appendChild(label);
-      }));
+      function isValid(x,y) {return x>=0&&x<boardSize&&y>=0&&y<boardSize;}
+      function inCheck(color){const opp=color==='w'?'b':'w';let k;board.forEach((r,y)=>r.forEach((c,x)=>c===color+'K'&&(k=[x,y])));for(let y=0;y<boardSize;y++)for(let x=0;x<boardSize;x++){const p=board[y][x];if(p&&p[0]===opp&&getMoves(x,y,true).some(m=>m[0]===k[0]&&m[1]===k[1]))return true;}return false;}
+      function isCheckmate(color){if(!inCheck(color))return false;for(let y=0;y<boardSize;y++)for(let x=0;x<boardSize;x++){const p=board[y][x];if(!p||p[0]!==color)continue;for(const[mx,my]of getMoves(x,y)){const b=board[my][mx];board[my][mx]=board[y][x];board[y][x]=null;if(!inCheck(color))return false;board[y][x]=board[my][mx];board[my][mx]=b;}}return true;}
+      function getMoves(x,y,ignoreCheck){if(!isValid(x,y)||!board[y][x])return[];const p=board[y][x],c=p[0],t=p[1],opp=c==='w'?'b':'w';let m=[];let type=(t==='P'&&(y===0||y===boardSize-1))?'F':t; if(type==='R')[[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy])=>{for(let i=1;i<boardSize;i++){const nx=x+dx*i,ny=y+dy*i;if(!isValid(nx,ny))break;const o=board[ny][nx];if(!o)m.push([nx,ny]);else{o[0]===opp&&m.push([nx,ny]);break;}}});const defs={E:{dirs:[[1,1],[1,-1],[-1,1],[-1,-1]],step:2},F:{dirs:[[1,1],[1,-1],[-1,1],[-1,-1]],step:1},N:{dirs:[[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]],step:1},K:{dirs:[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]],step:1}};defs[type]&&defs[type].dirs.forEach(([dx,dy])=>{const nx=x+dx*defs[type].step,ny=y+dy*defs[type].step;if(isValid(nx,ny)){const o=board[ny][nx];(!o||o[0]===opp)&&m.push([nx,ny]);}});if(t==='P'){const dir=c==='w'?1:-1;const nx=x,ny=y+dir;isValid(nx,ny)&&!board[ny][nx]&&m.push([nx,ny]);[[1,dir],[-1,dir]].forEach(([dx,dy])=>{const cx=x+dx,cy=y+dy;isValid(cx,cy)&&board[cy][cx]&&board[cy][cx][0]===opp&&m.push([cx,cy]);});}if(!ignoreCheck&&config.playMode==='play'){m=m.filter(([mx,my])=>{const b=board[my][mx];board[my][mx]=board[y][x];board[y][x]=null;const bad=inCheck(c);board[y][x]=board[my][mx];board[my][mx]=b;return!bad;});}return m;}
+      function updateTimers(){const wt=document.getElementById('whiteTimer'),bt=document.getElementById('blackTimer');if(config.timer==='none'){document.getElementById('timers').style.display='none';return;}document.getElementById('timers').style.display='flex';wt.textContent='White: '+formatTime(whiteTime);bt.textContent='Black: '+formatTime(blackTime);} function formatTime(s){const m=Math.floor(s/60),sec=s%60;return m.toString().padStart(2,'0')+':'+sec.toString().padStart(2,'0');}
+      function setupPalette(){const pal=document.getElementById('palette');pal.innerHTML='';const erase=document.createElement('button');erase.id='eraseButton';erase.textContent='Erase';erase.onclick=()=>{selectedPieceType=null;updatePalette();};pal.appendChild(erase);['w','b'].forEach(color=>pieceKeys.forEach(pt=>{const key=color+pt;const btn=document.createElement('button');btn.dataset.key=key;const img=document.createElement('img');img.src=images[key]?.src||'';btn.appendChild(img);btn.onclick=()=>{selectedPieceType=key;updatePalette();};pal.appendChild(btn);}));}function updatePalette(){document.querySelectorAll('#palette button').forEach(btn=>btn.classList.toggle('selected',btn.dataset.key===selectedPieceType));}
+      document.getElementById('settingsButton').onclick=()=>{const p=document.getElementById('settingsPanel');p.style.display=p.style.display==='block'?'none':'block';};
+      document.getElementById('playButton').onclick=()=>{const p=document.getElementById('playPanel');p.style.display=p.style.display==='block'?'none':'block';};
+      document.getElementById('confirmSettings').onclick=()=>{config.playMode=document.getElementById('playModeSelect').value;config.timer=document.getElementById('timerSelect').value;config.increment=document.getElementById('incrementToggle').checked;config.showGuider=document.getElementById('guiderToggle').checked;document.getElementById('playPanel').style.display='none';clearInterval(timerInterval);setupPalette();document.getElementById('palette').style.display=config.playMode==='custom'?'flex':'none';initBoard();if(config.timer!=='none'&&config.timer!=='open')timerInterval=setInterval(()=>{if(turn==='w')whiteTime--;else blackTime--;updateTimers();},1000);};
+      document.getElementById('resetButton').onclick=()=>{initBoard();};
+      document.getElementById('themeSelect').addEventListener('change',e=>{config.theme=e.target.value;drawBoard();});
 
-      setupPalette(); document.getElementById('palette').style.display='none'; initBoard();
+      canvas.onclick=e=>{const r=canvas.getBoundingClientRect(),x=Math.floor((e.clientX-r.left)/squareSize),y=Math.floor((e.clientY-r.top)/squareSize);if(!isValid(x,y)||gameOver)return;if(config.playMode==='custom'){board[y][x]=selectedPieceType;drawBoard();return;}if(!selectedSquare){const p=board[y][x];if(p&&(config.playMode==='free'||p[0]===turn)){selectedSquare=[x,y];drawBoard();}}else{const[sx,sy]=selectedSquare;const valid=config.playMode==='free'||getMoves(sx,sy).some(m=>m[0]===x&&m[1]===y);if(valid){board[y][x]=board[sy][sx];board[sy][sx]=null;if(config.increment){if(turn==='w')whiteTime+=10;else blackTime+=10;}if(config.playMode==='play'||config.playMode==='two'){if(inCheck(turn==='w'?'b':'w'))messageDiv.textContent='Check!';if(isCheckmate(turn==='w'?'b':'w')){gameOver=true;messageDiv.textContent=(turn==='w'?'Black':'White')+' is checkmated!';}turn=turn==='w'?'b':'w';}updateTimers();}selectedSquare=null;drawBoard();}};
+      const imgContainer=document.getElementById('imageInputs');imgContainer.innerHTML='';['w','b'].forEach(color=>pieceKeys.forEach(pt=>{const key=color+pt;const label=document.createElement('label');label.textContent=key+': ';const input=document.createElement('input');input.type='file';input.accept='image/*';input.onchange=ev=>{const file=ev.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=()=>{const img=new Image();img.src=reader.result;img.onload=()=>{images[key]=img;setupPalette();drawBoard();};images[key]=img;};reader.readAsDataURL(file);};label.appendChild(input);imgContainer.appendChild(label);}));
+      setupPalette();document.getElementById('palette').style.display='none';initBoard();
     });
   </script>
 </body>
