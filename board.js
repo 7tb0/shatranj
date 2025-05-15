@@ -1,8 +1,9 @@
-// board.js
 import { getConfig } from './settings.js';
 
 export let board = [];
-export let selectedSquare = null;
+let selectedSquare = null;
+export function getSelectedSquare() { return selectedSquare; }
+export function setSelectedSquare(val) { selectedSquare = val; }
 export let turn = 'w';
 export let gameOver = false;
 
@@ -94,7 +95,7 @@ export function isCheckmate(color) {
 
 export function initBoard(config, updateTimers, drawBoard) {
   board = Array.from({ length: 8 }, () => Array(8).fill(null));
-  selectedSquare = null;
+  setSelectedSquare(null);
   turn = 'w';
   gameOver = false;
   document.getElementById('message').textContent = '';
