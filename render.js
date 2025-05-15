@@ -1,19 +1,27 @@
 // render.js
 import { getConfig } from './settings.js';
-import { board, selectedSquare, getMoves } from './board.js';
+import { board, getSelectedSquare, getMoves } from './board.js';
 import { images } from './assets.js';
 
 let canvas, ctx;
+
+/**
+ * Call this once on load with your <canvas> element.
+ */
 export function setupCanvas(canvasElement) {
   canvas = canvasElement;
   ctx = canvas.getContext('2d');
   const dpr = window.devicePixelRatio || 1;
-  canvas.style.width = 8 * 60 + 'px';
+  canvas.style.width  = 8 * 60 + 'px';
   canvas.style.height = 8 * 60 + 'px';
-  canvas.width = 8 * 60 * dpr;
+  canvas.width  = 8 * 60 * dpr;
   canvas.height = 8 * 60 * dpr;
   ctx.scale(dpr, dpr);
 }
+
+/**
+ * Draw the 8×8 board, highlights, and pieces.
+ */
 export function drawBoard() {
   const { theme, showGuider, playMode } = getConfig();
   const squareSize = 60;
@@ -27,8 +35,10 @@ export function drawBoard() {
   };
   const colors = themes[theme] || themes.classic;
 
+  // Clear board
   ctx.clearRect(0, 0, 8 * squareSize, 8 * squareSize);
 
+  // Draw squares
   for (let y = 0; y < 8; y++) {
     for (let x = 0; x < 8; x++) {
       const isLight = (x + y) % 2 === 0;
@@ -43,17 +53,18 @@ export function drawBoard() {
     }
   }
 
-  // Move guider overlay
-  if (selectedSquare && showGuider && playMode === 'play') {
+  // Highlight legal moves
+  const selected = getSelectedSquare();
+  if (selected && showGuider && playMode === 'play') {
     ctx.fillStyle = 'rgba(0,255,0,0.3)';
-    getMoves(...selectedSquare).forEach(([mx, my]) => {
+    getMoves(...selected).forEach(([mx, my]) => {
       ctx.fillRect(mx * squareSize, my * squareSize, squareSize, squareSize);
     });
   }
 
-  // Selection border
-  if (selectedSquare) {
-    const [sx, sy] = selectedSquare;
+  // Draw selection border
+  if (selected) {
+    const [sx, sy] = selected;
     ctx.strokeStyle = 'red';
     ctx.lineWidth = 2;
     ctx.strokeRect(
@@ -64,6 +75,7 @@ export function drawBoard() {
     );
   }
 
+  // Draw pieces (or text fallback)
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.font = '20px sans-serif';
@@ -72,13 +84,12 @@ export function drawBoard() {
       const key = board[y][x];
       if (!key) continue;
       const img = images[key];
-      const px = x * squareSize;
-      const py = y * squareSize;
+      const px = x * squareSize, py = y * squareSize;
       if (img && img.complete && img.naturalWidth) {
         ctx.drawImage(img, px, py, squareSize, squareSize);
       } else {
         ctx.fillStyle = 'black';
-        ctx.fillText(key, px + squareSize / 2, py + squareSize / 2);
+        ctx.fillText(key, px + squareSize/2, py + squareSize/2);
       }
     }
   }
