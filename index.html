@@ -5,7 +5,6 @@
   <title>Custom Chess Variant</title>
   <link rel="stylesheet" href="styles.css">
   <style>
-    /* Inline quick styles for demo; use styles.css for more */
     html, body { height: 100%; margin: 0; }
     body { display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: sans-serif; }
     #boardContainer { position: relative; }
@@ -15,33 +14,31 @@
     #settingsButton { background: #ccc; color: #000; }
     #controls button:hover { opacity: 0.8; }
     #settingsPanel, #playPanel {
-      position: fixed;
-      top: 50%; left: 50%;
+      position: fixed; top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      background: #fff;
-      border: 1px solid #666;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-      z-index: 1000;
-      display: none;
-      width: 300px;
+      background: #fff; border: 1px solid #666; padding: 20px;
+      border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      z-index: 1000; display: none; width: 300px;
     }
     .closeBtn {
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      background: transparent;
-      border: none;
-      font-size: 18px;
-      line-height: 1;
-      cursor: pointer;
+      position: absolute; top: 8px; right: 8px;
+      background: transparent; border: none; font-size: 18px; cursor: pointer;
     }
+    #palette {
+      display: none;
+      position: absolute; top: 10px; right: -140px;
+      background: #f9f9f9; border: 1px solid #ccc; padding: 10px;
+      border-radius: 8px; max-width: 120px;
+    }
+    #palette img {
+      width: 40px; height: 40px; margin: 5px; cursor: pointer; border: 2px solid transparent;
+    }
+    #palette img.selected { border-color: red; }
   </style>
 </head>
 <body>
   <div id="boardContainer">
-    <canvas id="board"></canvas>
+    <canvas id="board" width="480" height="480"></canvas>
     <div id="palette"></div>
     <div id="timers">
       <div id="whiteTimer">White: 00:00</div>
@@ -56,7 +53,29 @@
   </div>
 
   <div id="settingsPanel"></div>
-  <div id="playPanel"></div>
+  <div id="playPanel">
+    <button class="closeBtn" id="closePlay">×</button>
+    <h3>Game Options</h3>
+    <button id="startButton" style="width:100%; padding:10px; margin-bottom:10px; background:blue; color:white; border:none; border-radius:5px;">Start</button>
+    <label>Play Mode:
+      <select id="playModeSelect">
+        <option value="free">Free Mode</option>
+        <option value="custom">Custom Mode</option>
+        <option value="play" selected>Play Mode</option>
+        <option value="two">2 Players Mode</option>
+      </select>
+    </label><br>
+    <label>Timer:
+      <select id="timerSelect">
+        <option value="none">No Timer</option>
+        <option value="5">5 Minutes</option>
+        <option value="10">10 Minutes</option>
+        <option value="open">Open</option>
+      </select>
+    </label><br>
+    <label><input type="checkbox" id="incrementToggle"> Add 10s increment</label><br>
+    <label><input type="checkbox" id="guiderToggle"> Show Move Guider</label>
+  </div>
 
   <script type="module" src="settings.js"></script>
   <script type="module" src="main.js"></script>
