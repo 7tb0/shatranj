@@ -7,7 +7,7 @@ const squareSize = 60;
 let board = [];
 let images = {};
 let selectedSquare = null;
-export let turn = 'w';
+let turn = 'w';
 let whiteTime = 0;
 let blackTime = 0;
 let timerInterval = null;
@@ -18,9 +18,9 @@ function setupCanvas() {
   canvas = document.getElementById('board');
   ctx = canvas.getContext('2d');
   const dpr = window.devicePixelRatio || 1;
-  canvas.style.width = boardSize * squareSize + 'px';
+  canvas.style.width  = boardSize * squareSize + 'px';
   canvas.style.height = boardSize * squareSize + 'px';
-  canvas.width = boardSize * squareSize * dpr;
+  canvas.width  = boardSize * squareSize * dpr;
   canvas.height = boardSize * squareSize * dpr;
   ctx.scale(dpr, dpr);
   canvas.addEventListener('click', handleClick);
@@ -30,7 +30,9 @@ function setupCanvas() {
 function preloadAssets() {
   images = {};
   const { imagePrefix } = getConfig();
-  const prefix = imagePrefix ? `pieces/set${imagePrefix}/` : '';
+  const prefix = imagePrefix
+    ? `pieces/set${imagePrefix}/`
+    : 'pieces/';
   ['R','N','E','F','K','P'].forEach(pt => {
     ['w','b'].forEach(color => {
       const key = color + pt;
@@ -102,7 +104,6 @@ function drawBoard() {
       const isLight = (x + y) % 2 === 0;
       ctx.fillStyle = isLight ? colors.light : colors.dark;
       ctx.fillRect(x * squareSize, y * squareSize, squareSize, squareSize);
-
       if (theme === 'red') {
         ctx.strokeStyle = 'red';
         ctx.lineWidth = 2;
@@ -167,65 +168,152 @@ function handleClick(e) {
     return;
   }
 
-  // Select piece
+  // Selecting a piece
   if (!selectedSquare) {
     const p = board[y][x];
     if (p && (config.playMode === 'free' || p[0] === turn)) {
       selectedSquare = [x, y];
       drawBoard();
     }
-  } else {
-    // Attempt move
-    const [sx, sy] = selectedSquare;
-    const moves = config.playMode === 'free' ? [[x,y]] : getMoves(sx, sy);
-    if (moves.some(m => m[0] === x && m[1] === y)) {
-      board[y][x] = board[sy][sx];
-      board[sy][sx] = null;
-
-      // Check & checkmate
-      if (config.playMode === 'play' || config.playMode === 'two') {
-        const enemy = turn === 'w' ? 'b' : 'w';
-        if (inCheck(enemy)) {
-          document.getElementById('message').textContent = 'Check!';
-        } else {
-          document.getElementById('message').textContent = '';
-        }
-        if (isCheckmate(enemy)) {
-          gameOver = true;
-          document.getElementById('message').textContent =
-            (enemy === 'w' ? 'White' : 'Black') + ' is checkmated!';
-        }
-        // Swap turn
-        turn = enemy;
-      }
-
-      // Timer increment
-      if (config.increment) {
-        if (turn === 'w') whiteTime += 10; else blackTime += 10;
-        updateTimers();
-      }
-    }
-    selectedSquare = null;
-    drawBoard();
+    return;
   }
+
+  // Moving a piece
+  const [sx, sy] = selectedSquare;
+  const moves = config.playMode === 'free'
+    ? [[x, y]]
+    : getMoves(sx, sy);
+
+  if (moves.some(m => m[0] === x && m[1] === y)) {
+    board[y][x] = board[sy][sx];
+    board[sy][sx] = null;
+
+    // Check / checkmate / turn swap
+    if (config.playMode === 'play' || config.playMode === 'two') {
+      const enemy = turn === 'w' ? 'b' : 'w';
+      if (inCheck(enemy)) {
+        document.getElementById('message').textContent = 'Check!';
+      } else {
+        document.getElementById('message').textContent = '';
+      }
+      if (isCheckmate(enemy)) {
+        gameOver = true;
+        document.getElementById('message').textContent =
+          (enemy === 'w' ? 'White' : 'Black') + ' is checkmated!';
+      }
+      turn = enemy;
+    }
+  }
+
+  selectedSquare = null;
+  drawBoard();
 }
 
 function isValid(x, y) {
   return x >= 0 && x < boardSize && y >= 0 && y < boardSize;
 }
 
-// Chess move calculations...
+// Generate legal moves
 function getMoves(x, y, ignoreCheck = false) {
-  // … (exactly as in your original code; copy-paste here)
-  // For brevity, assume you paste the full getMoves logic you had originally.
+  if (!isValid(x, y) || !board[y][x]) return [];
+  const p = board[y][x], color = p[0], t = p[1], opp = color === 'w' ? 'b' : 'w';
+  let moves = [], type = t;
+  if (t === 'P' && (y === 0 || y === boardSize - 1)) type = 'F';
+
+  if (type === 'R') {
+    [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy]) => {
+      for (let i = 1; i < boardSize; i++) {
+        const nx = x + dx*i, ny = y + dy*i;
+        if (!isValid(nx, ny)) break;
+        const o = board[ny][nx];
+        if (!o) moves.push([nx, ny]);
+        else { if (o[0] === opp) moves.push([nx, ny]); break; }
+      }
+    });
+  }
+
+  const defs = {
+    E: { dirs: [[1,1],[1,-1],[-1,1],[-1,-1]], step: 2 },
+    F: { dirs: [[1,1],[1,-1],[-1,1],[-1,-1]], step: 1 },
+    N: { dirs: [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]], step:1 },
+    K: { dirs: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]], step:1 }
+  };
+  if (defs[type]) {
+    defs[type].dirs.forEach(([dx,dy]) => {
+      const nx = x + dx*defs[type].step, ny = y + dy*defs[type].step;
+      if (isValid(nx, ny)) {
+        const o = board[ny][nx];
+        if (!o || o[0] === opp) moves.push([nx, ny]);
+      }
+    });
+  }
+
+  if (t === 'P') {
+    const dir = color === 'w' ? 1 : -1;
+    const nx = x, ny = y + dir;
+    if (isValid(nx, ny) && !board[ny][nx]) moves.push([nx, ny]);
+    [[1,dir],[-1,dir]].forEach(([dx,dy]) => {
+      const cx = x + dx, cy = y + dy;
+      if (isValid(cx, cy) && board[cy][cx] && board[cy][cx][0] === opp)
+        moves.push([cx, cy]);
+    });
+  }
+
+  if (!ignoreCheck && getConfig().playMode === 'play') {
+    moves = moves.filter(([mx, my]) => {
+      const backup = board[my][mx];
+      board[my][mx] = board[y][x];
+      board[y][x] = null;
+      const bad = inCheck(color);
+      board[y][x] = board[my][mx];
+      board[my][mx] = backup;
+      return !bad;
+    });
+  }
+
+  return moves;
 }
 
 function inCheck(color) {
-  // … your original inCheck logic
+  const opp = color === 'w' ? 'b' : 'w';
+  let kpos;
+  board.forEach((row,y) =>
+    row.forEach((c,x) => { if (c === color+'K') kpos=[x,y]; })
+  );
+  for (let y = 0; y < boardSize; y++) {
+    for (let x = 0; x < boardSize; x++) {
+      const p = board[y][x];
+      if (p && p[0] === opp) {
+        if (getMoves(x, y, true).some(m =>
+          m[0] === kpos[0] && m[1] === kpos[1]
+        )) return true;
+      }
+    }
+  }
+  return false;
 }
 
 function isCheckmate(color) {
-  // … your original isCheckmate logic
+  if (!inCheck(color)) return false;
+  for (let y = 0; y < boardSize; y++) {
+    for (let x = 0; x < boardSize; x++) {
+      const p = board[y][x];
+      if (!p || p[0] !== color) continue;
+      for (const [mx,my] of getMoves(x, y)) {
+        const backup = board[my][mx];
+        board[my][mx] = board[y][x];
+        board[y][x] = null;
+        if (!inCheck(color)) {
+          board[y][x] = board[my][mx];
+          board[my][mx] = backup;
+          return false;
+        }
+        board[y][x] = board[my][mx];
+        board[my][mx] = backup;
+      }
+    }
+  }
+  return true;
 }
 
 function updateTimers() {
