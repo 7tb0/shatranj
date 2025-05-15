@@ -6,18 +6,17 @@ export let images = {};
 export function preloadAssets(drawBoardCallback) {
   images = {};
   const { imagePrefix } = getConfig();
-  // Always look in pieces/; if the user picked “1”, go into pieces/set1/
-  const basePath = imagePrefix
-    ? `pieces/set${imagePrefix}/`
-    : 'pieces/';
+  // imagePrefix will be '' for default, or e.g. '1' for Set 1
+  const prefix = imagePrefix || '';
 
   ['R','N','E','F','K','P'].forEach(pt => {
     ['w','b'].forEach(color => {
-      const key = color + pt;
+      const key = color + pt;                    // e.g. 'wF'
+      const filename = `${prefix}${key}.png`;    // e.g. '1wF.png'
       const img = new Image();
       if (drawBoardCallback) img.onload = drawBoardCallback;
-      img.onerror = () => console.warn(`Could not load image: ${basePath}${key}.png`);
-      img.src = `${basePath}${key}.png`;
+      img.onerror = () => console.warn(`Could not load image: pieces/${filename}`);
+      img.src = `pieces/${filename}`;
       images[key] = img;
     });
   });
