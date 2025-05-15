@@ -35,13 +35,13 @@ function buildSettingsHTML() {
         <option value="dark">Dark</option>
         <option value="sand">Sand</option>
         <option value="ice">Ice</option>
+        <option value="red">Red</option>      <!-- New -->
       </select>
     </label>
     <label>Piece Set:
       <select id="setSelect">
         <option value="">Default</option>
         <option value="1">Set 1</option>
-        <!-- add more sets here -->
       </select>
     </label>
     <label><input type="checkbox" id="guiderToggle"> Show Move Guider</label>
