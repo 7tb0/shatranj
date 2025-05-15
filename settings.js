@@ -26,6 +26,7 @@ function notifyChange() {
 
 function buildSettingsHTML() {
   return `
+    <button class="closeBtn" id="closeSettings">×</button>
     <h3>Settings</h3>
     <label>Theme:
       <select id="themeSelect">
@@ -40,7 +41,7 @@ function buildSettingsHTML() {
       <select id="setSelect">
         <option value="">Default</option>
         <option value="1">Set 1</option>
-        <!-- add more <option> values here for additional sets -->
+        <!-- add more sets here -->
       </select>
     </label>
     <label><input type="checkbox" id="guiderToggle"> Show Move Guider</label>
@@ -49,6 +50,7 @@ function buildSettingsHTML() {
 
 function buildPlayHTML() {
   return `
+    <button class="closeBtn" id="closePlay">×</button>
     <h3>Game Options</h3>
     <label>Play Mode:
       <select id="playModeSelect">
@@ -83,6 +85,10 @@ function attachSettingsListeners() {
     config.showGuider = e.target.checked;
     notifyChange();
   });
+  // Close button
+  document.getElementById('closeSettings').addEventListener('click', () => {
+    document.getElementById('settingsPanel').style.display = 'none';
+  });
 }
 
 function attachPlayListeners() {
@@ -97,6 +103,10 @@ function attachPlayListeners() {
   document.getElementById('incrementToggle').addEventListener('change', e => {
     config.increment = e.target.checked;
     notifyChange();
+  });
+  // Close button
+  document.getElementById('closePlay').addEventListener('click', () => {
+    document.getElementById('playPanel').style.display = 'none';
   });
 }
 
@@ -119,6 +129,6 @@ window.addEventListener('DOMContentLoaded', () => {
     p.style.display = p.style.display === 'block' ? 'none' : 'block';
   };
 
-  // kick off initial notification so main.js can load with defaults
+  // initial load
   notifyChange();
 });
