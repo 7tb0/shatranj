@@ -13,10 +13,10 @@ let blackTime = 0;
 let timerInterval = null;
 let gameOver = false;
 
-// Initialize canvas and click handler
+// 1) Initialize the canvas and click handler
 function setupCanvas() {
   canvas = document.getElementById('board');
-  ctx = canvas.getContext('2d');
+  ctx    = canvas.getContext('2d');
   const dpr = window.devicePixelRatio || 1;
   canvas.style.width  = boardSize * squareSize + 'px';
   canvas.style.height = boardSize * squareSize + 'px';
@@ -26,26 +26,25 @@ function setupCanvas() {
   canvas.addEventListener('click', handleClick);
 }
 
-// Load piece images from pieces/ folder with optional prefix
+// 2) Preload all piece images from the single `pieces/` folder
 function preloadAssets() {
   images = {};
-  const { imagePrefix } = getConfig();
-  const prefix = imagePrefix || ''; // '' for default, '1' for Set 1, etc.
+  const prefix = getConfig().imagePrefix || ''; // '' = default, '1' = Set1, etc.
 
   ['R','N','E','F','K','P'].forEach(pt => {
     ['w','b'].forEach(color => {
-      const key = color + pt;                 // e.g. 'wR', 'bF'
-      const filename = `${prefix}${key}.png`; // e.g. '1wR.png' or 'bF.png'
+      const key = color + pt;                     // e.g. 'wR' or 'bF'
+      const filename = `${prefix}${key}.png`;     // e.g. '1wR.png' or 'bF.png'
       const img = new Image();
-      img.onload = drawBoard;
+      img.onload  = drawBoard;
       img.onerror = () => console.warn(`Could not load image: pieces/${filename}`);
-      img.src = `pieces/${filename}`;
+      img.src     = `pieces/${filename}`;
       images[key] = img;
     });
   });
 }
 
-// Initialize board array and timers
+// 3) Set up the initial board and timers
 function initBoard() {
   const config = getConfig();
   board = Array.from({ length: boardSize }, () => Array(boardSize).fill(null));
@@ -83,16 +82,16 @@ function initBoard() {
   }
 }
 
-// Draw the board, pieces, and overlays
+// 4) Draw board, highlights, and pieces
 function drawBoard() {
   const { theme, showGuider, playMode } = getConfig();
   const themes = {
-    classic: { light: '#f0d9b5', dark: '#b58863' },
-    wood:    { light: '#d2a679', dark: '#8b5a2b' },
-    dark:    { light: '#4f5b75', dark: '#2a2e38' },
-    sand:    { light: '#d8c3a5', dark: '#b0906f' },
-    ice:     { light: '#e3f2fd', dark: '#90a4ae' },
-    red:     { light: '#ffffff', dark: '#ffc0cb' }
+    classic: { light:'#f0d9b5', dark:'#b58863' },
+    wood:    { light:'#d2a679', dark:'#8b5a2b' },
+    dark:    { light:'#4f5b75', dark:'#2a2e38' },
+    sand:    { light:'#d8c3a5', dark:'#b0906f' },
+    ice:     { light:'#e3f2fd', dark:'#90a4ae' },
+    red:     { light:'#ffffff', dark:'#ffc0cb' }
   };
   const colors = themes[theme] || themes.classic;
 
@@ -115,14 +114,14 @@ function drawBoard() {
   // Move guider
   if (selectedSquare && showGuider && playMode === 'play') {
     ctx.fillStyle = 'rgba(0,255,0,0.3)';
-    getMoves(...selectedSquare).forEach(([mx, my]) => {
-      ctx.fillRect(mx * squareSize, my * squareSize, squareSize, squareSize);
-    });
+    getMoves(...selectedSquare).forEach(([mx,my]) =>
+      ctx.fillRect(mx * squareSize, my * squareSize, squareSize, squareSize)
+    );
   }
 
   // Selection border
   if (selectedSquare) {
-    const [sx, sy] = selectedSquare;
+    const [sx,sy] = selectedSquare;
     ctx.strokeStyle = 'red';
     ctx.lineWidth = 2;
     ctx.strokeRect(
@@ -153,15 +152,15 @@ function drawBoard() {
   }
 }
 
-// Click handler
+// 5) Handle clicks (select & move)
 function handleClick(e) {
   const rect = canvas.getBoundingClientRect();
   const x = Math.floor((e.clientX - rect.left) / squareSize);
-  const y = Math.floor((e.clientY - rect.top) / squareSize);
-  if (!isValid(x, y) || gameOver) return;
+  const y = Math.floor((e.clientY - rect.top)  / squareSize);
+  if (!isValid(x,y) || gameOver) return;
   const config = getConfig();
 
-  // Custom mode: draw/erase
+  // Custom mode
   if (config.playMode === 'custom') {
     board[y][x] = selectedSquare ? '' : board[y][x];
     drawBoard();
@@ -172,30 +171,27 @@ function handleClick(e) {
   if (!selectedSquare) {
     const p = board[y][x];
     if (p && (config.playMode === 'free' || p[0] === turn)) {
-      selectedSquare = [x, y];
+      selectedSquare = [x,y];
       drawBoard();
     }
     return;
   }
 
   // Move
-  const [sx, sy] = selectedSquare;
-  const moves = config.playMode === 'free' ? [[x,y]] : getMoves(sx, sy);
-  if (moves.some(m => m[0] === x && m[1] === y)) {
-    board[y][x] = board[sy][sx];
+  const [sx,sy] = selectedSquare;
+  const moves = config.playMode === 'free' ? [[x,y]] : getMoves(sx,sy);
+  if (moves.some(m=>m[0]===x&&m[1]===y)) {
+    board[y][x]   = board[sy][sx];
     board[sy][sx] = null;
 
-    if (config.playMode === 'play' || config.playMode === 'two') {
-      const enemy = turn === 'w' ? 'b' : 'w';
-      if (inCheck(enemy)) {
-        document.getElementById('message').textContent = 'Check!';
-      } else {
-        document.getElementById('message').textContent = '';
-      }
+    if (config.playMode==='play'||config.playMode==='two') {
+      const enemy = turn==='w'?'b':'w';
+      document.getElementById('message').textContent =
+        inCheck(enemy) ? 'Check!' : '';
       if (isCheckmate(enemy)) {
         gameOver = true;
         document.getElementById('message').textContent =
-          (enemy === 'w' ? 'White' : 'Black') + ' is checkmated!';
+          (enemy==='w'?'White':'Black')+' is checkmated!';
       }
       turn = enemy;
     }
@@ -205,48 +201,46 @@ function handleClick(e) {
   drawBoard();
 }
 
-function isValid(x, y) {
-  return x >= 0 && x < boardSize && y >= 0 && y < boardSize;
+function isValid(x,y) {
+  return x>=0&&x<boardSize&&y>=0&&y<boardSize;
 }
 
-function getMoves(x, y, ignoreCheck = false) {
-  if (!isValid(x, y) || !board[y][x]) return [];
-  const p = board[y][x], color = p[0], t = p[1], opp = color === 'w' ? 'b' : 'w';
-  let moves = [], type = t;
-  if (t === 'P' && (y === 0 || y === boardSize-1)) type = 'F';
+// 6) Move logic (identical to your original)
+function getMoves(x,y,ignoreCheck=false) {
+  if (!isValid(x,y)||!board[y][x]) return [];
+  const p = board[y][x], color=p[0], t=p[1], opp=color==='w'?'b':'w';
+  let moves = [], type=t;
+  if (t==='P'&&(y===0||y===boardSize-1)) type='F';
 
-  // Rook-like
-  if (type === 'R') {
-    [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy]) => {
-      for (let i=1; i<boardSize; i++) {
+  if (type==='R') {
+    [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy])=>{
+      for(let i=1;i<boardSize;i++){
         const nx=x+dx*i, ny=y+dy*i;
-        if (!isValid(nx,ny)) break;
+        if(!isValid(nx,ny))break;
         const o=board[ny][nx];
-        if (!o) moves.push([nx,ny]);
-        else { if(o[0]===opp) moves.push([nx,ny]); break; }
+        if(!o)moves.push([nx,ny]);
+        else{ if(o[0]===opp)moves.push([nx,ny]); break; }
       }
     });
   }
 
-  // Bishop/elephant, knight, king
   const defs = {
-    E: { dirs:[[1,1],[1,-1],[-1,1],[-1,-1]], step:2 },
-    F: { dirs:[[1,1],[1,-1],[-1,1],[-1,-1]], step:1 },
-    N: { dirs:[[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]], step:1 },
-    K: { dirs:[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]], step:1 }
+    E:{dirs:[[1,1],[1,-1],[-1,1],[-1,-1]],step:2},
+    F:{dirs:[[1,1],[1,-1],[-1,1],[-1,-1]],step:1},
+    N:{dirs:[[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]],step:1},
+    K:{dirs:[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]],step:1}
   };
-  if(defs[type]) defs[type].dirs.forEach(([dx,dy])=>{
+  if(defs[type])defs[type].dirs.forEach(([dx,dy])=>{
     const nx=x+dx*defs[type].step, ny=y+dy*defs[type].step;
     if(isValid(nx,ny)){
       const o=board[ny][nx];
-      if(!o||o[0]===opp) moves.push([nx,ny]);
+      if(!o||o[0]===opp)moves.push([nx,ny]);
     }
   });
 
-  // Pawn
   if(t==='P'){
     const dir=color==='w'?1:-1;
-    if(isValid(x,y+dir)&&!board[y+dir][x]) moves.push([x,y+dir]);
+    if(isValid(x,y+dir)&&!board[y+dir][x])moves.push([x,y+dir]);
     [[1,dir],[-1,dir]].forEach(([dx,dy])=>{
       const cx=x+dx, cy=y+dy;
       if(isValid(cx,cy)&&board[cy][cx]&&board[cy][cx][0]===opp)
@@ -254,13 +248,14 @@ function getMoves(x, y, ignoreCheck = false) {
     });
   }
 
-  // Filter moves leaving king in check
-  if(!ignoreCheck && getConfig().playMode==='play'){
+  if(!ignoreCheck&&getConfig().playMode==='play'){
     moves = moves.filter(([mx,my])=>{
       const backup=board[my][mx];
-      board[my][mx]=board[y][x]; board[y][x]=null;
+      board[my][mx]=board[y][x];
+      board[y][x]=null;
       const bad=inCheck(color);
-      board[y][x]=board[my][mx]; board[my][mx]=backup;
+      board[y][x]=board[my][mx];
+      board[my][mx]=backup;
       return !bad;
     });
   }
@@ -304,17 +299,18 @@ function isCheckmate(color){
   return true;
 }
 
+// 7) Timers
 function updateTimers(){
-  const { timer }=getConfig();
-  const wt=document.getElementById('whiteTimer');
-  const bt=document.getElementById('blackTimer');
+  const { timer } = getConfig();
+  const wt = document.getElementById('whiteTimer');
+  const bt = document.getElementById('blackTimer');
   if(timer==='none'){
     document.getElementById('timers').style.display='none';
     return;
   }
   document.getElementById('timers').style.display='flex';
-  wt.textContent='White: '+formatTime(whiteTime);
-  bt.textContent='Black: '+formatTime(blackTime);
+  wt.textContent = 'White: '+formatTime(whiteTime);
+  bt.textContent = 'Black: '+formatTime(blackTime);
 }
 
 function formatTime(s){
@@ -322,13 +318,13 @@ function formatTime(s){
   return m.toString().padStart(2,'0')+':'+sec.toString().padStart(2,'0');
 }
 
-// React to settings changes
+// 8) React to settings changes
 onConfigChange(()=>{
   preloadAssets();
   initBoard();
 });
 
-// Initial load
+// 9) Initial load
 window.addEventListener('DOMContentLoaded',()=>{
   setupCanvas();
   preloadAssets();
