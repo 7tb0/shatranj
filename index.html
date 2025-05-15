@@ -3,7 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <title>Custom Chess Variant</title>
+  <!-- Link external stylesheet if needed -->
   <link rel="stylesheet" href="styles.css">
+  <style>
+    /* Minimal fallback styling */
+    #boardContainer { margin-bottom: 10px; }
+    #controls button { margin-right: 5px; }
+  </style>
 </head>
 <body>
   <div id="boardContainer">
@@ -21,13 +27,11 @@
     <button id="playButton">Play</button>
   </div>
 
-  <!-- Settings and play panels will be injected by settings.js -->
   <div id="settingsPanel"></div>
   <div id="playPanel"></div>
 
-  <!-- Load settings manager first -->
-  <script src="settings.js"></script>
-  <!-- Main game logic -->
-  <script src="main.js"></script>
+  <!-- Load as ES modules so imports work -->
+  <script type="module" src="settings.js"></script>
+  <script type="module" src="main.js"></script>
 </body>
 </html>
