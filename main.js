@@ -89,43 +89,109 @@ function drawBoard() {
     wood:    { light: '#d2a679', dark: '#8b5a2b' },
     dark:    { light: '#4f5b75', dark: '#2a2e38' },
     sand:    { light: '#d8c3a5', dark: '#b0906f' },
-    ice:     { light: '#e3f2fd', dark: '#90a4ae' }
+    ice:     { light: '#e3f2fd', dark: '#90a4ae' },
+    red:     { light: '#ffffff', dark: '#ffc0cb' }
   };
-  const colors = themes[theme];
+  const colors = themes[theme] || themes.classic;
 
   ctx.clearRect(0, 0, boardSize * squareSize, boardSize * squareSize);
-  // Squares
+
+  // Draw squares with optional red outlines
   for (let y = 0; y < boardSize; y++) {
     for (let x = 0; x < boardSize; x++) {
-      ctx.fillStyle = (x + y) % 2 === 0 ? colors.light : colors.dark;
+      const isLight = (x + y) % 2 === 0;
+      ctx.fillStyle = isLight ? colors.light : colors.dark;
       ctx.fillRect(x * squareSize, y * squareSize, squareSize, squareSize);
+
+      if (theme === 'red') {
+        ctx.strokeStyle = 'red';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x * squareSize, y * squareSize, squareSize, squareSize);
+      }
     }
   }
-  // Move guider
+
+  // Move guider overlay
   if (selectedSquare && showGuider && playMode === 'play') {
     ctx.fillStyle = 'rgba(0,255,0,0.3)';
     getMoves(...selectedSquare).forEach(([mx, my]) => {
       ctx.fillRect(mx * squareSize, my * squareSize, squareSize, squareSize);
     });
   }
+
   // Selection border
   if (selectedSquare) {
     const [sx, sy] = selectedSquare;
-    ctx.strokeStyle = 'red'; ctx.lineWidth = 2;
-    ctx.strokeRect(sx * squareSize + 2, sy * squareSize + 2, squareSize - 4, squareSize - 4);
+    ctx.strokeStyle = 'red';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(
+      sx * squareSize + 2,
+      sy * squareSize + 2,
+      squareSize - 4,
+      squareSize - 4
+    );
   }
-  // Pieces or text fallback
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '20px sans-serif';
+
+  // Draw pieces with text fallback
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '20px sans-serif';
   for (let y = 0; y < boardSize; y++) {
     for (let x = 0; x < boardSize; x++) {
       const key = board[y][x];
       if (!key) continue;
       const img = images[key];
+      const px = x * squareSize;
+      const py = y * squareSize;
       if (img && img.complete && img.naturalWidth) {
-        ctx.drawImage(img, x * squareSize, y * squareSize, squareSize, squareSize);
+        ctx.drawImage(img, px, py, squareSize, squareSize);
       } else {
         ctx.fillStyle = 'black';
-        ctx.fillText(key, x * squareSize + squareSize/2, y * squareSize + squareSize/2);
+        ctx.fillText(key, px + squareSize / 2, py + squareSize / 2);
+      }
+    }
+  }
+}
+    }
+  }
+
+  // Move guider overlay
+  if (selectedSquare && showGuider && playMode === 'play') {
+    ctx.fillStyle = 'rgba(0,255,0,0.3)';
+    getMoves(...selectedSquare).forEach(([mx, my]) => {
+      ctx.fillRect(mx * squareSize, my * squareSize, squareSize, squareSize);
+    });
+  }
+
+  // Selection border
+  if (selectedSquare) {
+    const [sx, sy] = selectedSquare;
+    ctx.strokeStyle = 'red';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(
+      sx * squareSize + 2,
+      sy * squareSize + 2,
+      squareSize - 4,
+      squareSize - 4
+    );
+  }
+
+  // Draw pieces with text fallback
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '20px sans-serif';
+  for (let y = 0; y < boardSize; y++) {
+    for (let x = 0; x < boardSize; x++) {
+      const key = board[y][x];
+      if (!key) continue;
+      const img = images[key];
+      const px = x * squareSize;
+      const py = y * squareSize;
+      if (img && img.complete && img.naturalWidth) {
+        ctx.drawImage(img, px, py, squareSize, squareSize);
+      } else {
+        ctx.fillStyle = 'black';
+        ctx.fillText(key, px + squareSize / 2, py + squareSize / 2);
       }
     }
   }
@@ -139,34 +205,39 @@ function handleClick(e) {
   if (!isValid(x, y) || gameOver) return;
   const config = getConfig();
   if (config.playMode === 'custom') {
-    board[y][x] = selectedSquare ? '' : board[y][x]; // could add palette logic
+    board[y][x] = selectedSquare ? '' : board[y][x];
     drawBoard();
     return;
   }
   if (!selectedSquare) {
     const p = board[y][x];
     if (p && (config.playMode === 'free' || p[0] === turn)) {
-      selectedSquare = [x, y]; drawBoard();
+      selectedSquare = [x, y];
+      drawBoard();
     }
   } else {
     const [sx, sy] = selectedSquare;
-    const moves = config.playMode === 'free' ? [[x,y]] : getMoves(sx, sy);
+    const moves = config.playMode === 'free' ? [[x, y]] : getMoves(sx, sy);
     if (moves.some(m => m[0] === x && m[1] === y)) {
-      board[y][x] = board[sy][sx]; board[sy][sx] = null;
+      board[y][x] = board[sy][sx];
+      board[sy][sx] = null;
       if (config.increment) {
-        if (turn === 'w') whiteTime += 10; else blackTime += 10;
+        turn === 'w' ? whiteTime += 10 : blackTime += 10;
       }
       if (config.playMode === 'play' || config.playMode === 'two') {
-        if (inCheck(turn === 'w' ? 'b' : 'w')) document.getElementById('message').textContent = 'Check!';
+        if (inCheck(turn === 'w' ? 'b' : 'w'))
+          document.getElementById('message').textContent = 'Check!';
         if (isCheckmate(turn === 'w' ? 'b' : 'w')) {
           gameOver = true;
-          document.getElementById('message').textContent = (turn === 'w' ? 'Black' : 'White') + ' is checkmated!';
+          document.getElementById('message').textContent =
+            (turn === 'w' ? 'Black' : 'White') + ' is checkmated!';
         }
         turn = turn === 'w' ? 'b' : 'w';
       }
       updateTimers();
     }
-    selectedSquare = null; drawBoard();
+    selectedSquare = null;
+    drawBoard();
   }
 }
 
@@ -181,19 +252,17 @@ function getMoves(x, y, ignoreCheck = false) {
   let moves = [];
   let type = t;
   if (t === 'P' && (y === 0 || y === boardSize - 1)) type = 'F';
-  // Rook
   if (type === 'R') {
     [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy]) => {
-      for (let i=1; i<boardSize; i++) {
-        const nx = x+dx*i, ny = y+dy*i;
-        if (!isValid(nx,ny)) break;
+      for (let i = 1; i < boardSize; i++) {
+        const nx = x + dx*i, ny = y + dy*i;
+        if (!isValid(nx, ny)) break;
         const o = board[ny][nx];
-        if (!o) moves.push([nx,ny]);
-        else { if (o[0]===opp) moves.push([nx,ny]); break; }
+        if (!o) moves.push([nx, ny]);
+        else { if (o[0] === opp) moves.push([nx, ny]); break; }
       }
     });
   }
-  // Other pieces
   const defs = {
     E: { dirs: [[1,1],[1,-1],[-1,1],[-1,-1]], step: 2 },
     F: { dirs: [[1,1],[1,-1],[-1,1],[-1,-1]], step: 1 },
@@ -201,25 +270,24 @@ function getMoves(x, y, ignoreCheck = false) {
     K: { dirs: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]], step:1 }
   };
   if (defs[type]) defs[type].dirs.forEach(([dx,dy]) => {
-    const nx = x+dx*defs[type].step, ny = y+dy*defs[type].step;
-    if (isValid(nx,ny)) {
+    const nx = x + dx*defs[type].step, ny = y + dy*defs[type].step;
+    if (isValid(nx, ny)) {
       const o = board[ny][nx];
-      if (!o || o[0] === opp) moves.push([nx,ny]);
+      if (!o || o[0] === opp) moves.push([nx, ny]);
     }
   });
-  // Pawn
   if (t === 'P') {
     const dir = color === 'w' ? 1 : -1;
-    const nx = x, ny = y+dir;
-    if (isValid(nx,ny) && !board[ny][nx]) moves.push([nx,ny]);
-    [[1,dir],[-1,dir]].forEach(([dx,dy]) => {
-      const cx = x+dx, cy = y+dy;
-      if (isValid(cx,cy) && board[cy][cx] && board[cy][cx][0]===opp) moves.push([cx,cy]);
+    const nx = x, ny = y + dir;
+    if (isValid(nx, ny) && !board[ny][nx]) moves.push([nx, ny]);
+    [[1, dir],[-1, dir]].forEach(([dx,dy]) => {
+      const cx = x + dx, cy = y + dy;
+      if (isValid(cx, cy) && board[cy][cx] && board[cy][cx][0] === opp)
+        moves.push([cx, cy]);
     });
   }
-  // Filter out moves leaving king in check
   if (!ignoreCheck && getConfig().playMode === 'play') {
-    moves = moves.filter(([mx,my]) => {
+    moves = moves.filter(([mx, my]) => {
       const backup = board[my][mx];
       board[my][mx] = board[y][x]; board[y][x] = null;
       const bad = inCheck(color);
@@ -234,11 +302,11 @@ function inCheck(color) {
   const opp = color === 'w' ? 'b' : 'w';
   let kpos;
   board.forEach((row,y) => row.forEach((c,x) => { if (c === color+'K') kpos=[x,y]; }));
-  for (let y=0; y<boardSize; y++) {
-    for (let x=0; x<boardSize; x++) {
+  for (let y = 0; y < boardSize; y++) {
+    for (let x = 0; x < boardSize; x++) {
       const p = board[y][x];
-      if (p && p[0]===opp) {
-        if (getMoves(x,y,true).some(m => m[0]===kpos[0] && m[1]===kpos[1])) return true;
+      if (p && p[0] === opp) {
+        if (getMoves(x, y, true).some(m => m[0] === kpos[0] && m[1] === kpos[1])) return true;
       }
     }
   }
@@ -247,10 +315,10 @@ function inCheck(color) {
 
 function isCheckmate(color) {
   if (!inCheck(color)) return false;
-  for (let y=0; y<boardSize; y++) {
-    for (let x=0; x<boardSize; x++) {
-      const p = board[y][x]; if (!p||p[0]!==color) continue;
-      for (const [mx,my] of getMoves(x,y)) {
+  for (let y = 0; y < boardSize; y++) {
+    for (let x = 0; x < boardSize; x++) {
+      const p = board[y][x]; if (!p || p[0] !== color) continue;
+      for (const [mx, my] of getMoves(x, y)) {
         const backup = board[my][mx]; board[my][mx] = board[y][x]; board[y][x] = null;
         if (!inCheck(color)) return false;
         board[y][x] = board[my][mx]; board[my][mx] = backup;
@@ -264,13 +332,13 @@ function updateTimers() {
   const { timer } = getConfig();
   const wt = document.getElementById('whiteTimer');
   const bt = document.getElementById('blackTimer');
-  if (timer==='none') { document.getElementById('timers').style.display='none'; return; }
-  document.getElementById('timers').style.display='flex';
+  if (timer === 'none') { document.getElementById('timers').style.display = 'none'; return; }
+  document.getElementById('timers').style.display = 'flex';
   wt.textContent = 'White: ' + formatTime(whiteTime);
   bt.textContent = 'Black: ' + formatTime(blackTime);
 }
 
-function formatTime(s) { const m=Math.floor(s/60),sec=s%60; return m.toString().padStart(2,'0')+':'+sec.toString().padStart(2,'0'); }
+function formatTime(s) { const m = Math.floor(s/60), sec = s % 60; return m.toString().padStart(2,'0') + ':' + sec.toString().padStart(2,'0'); }
 
 // React to settings changes
 onConfigChange(() => {
