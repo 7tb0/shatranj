@@ -112,12 +112,16 @@
 
       // Preload assets
       (function preloadAssets() {
-        const assetsPath = 'assets/';
+        // Load images from same directory as index.html
         pieceKeys.forEach(pt => ['w','b'].forEach(color => {
           const key = color + pt;
           const img = new Image();
           img.onload = drawBoard;
-          img.src = assetsPath + key + '.png';
+          img.onerror = () => {
+            // If not found in root, try assets folder as fallback
+            img.src = 'assets/' + key + '.png';
+          };
+          img.src = key + '.png';
           images[key] = img;
         }));
       })();
