@@ -1,6 +1,4 @@
 // settings.js
-// Manages rendering and interaction of Settings and Play panels, plus piece-set selection
-
 const config = {
   theme: 'classic',
   playMode: 'free',
@@ -35,7 +33,7 @@ function buildSettingsHTML() {
         <option value="dark">Dark</option>
         <option value="sand">Sand</option>
         <option value="ice">Ice</option>
-        <option value="red">Red</option>      <!-- New -->
+        <option value="red">Red</option>
       </select>
     </label>
     <label>Piece Set:
@@ -85,7 +83,6 @@ function attachSettingsListeners() {
     config.showGuider = e.target.checked;
     notifyChange();
   });
-  // Close button
   document.getElementById('closeSettings').addEventListener('click', () => {
     document.getElementById('settingsPanel').style.display = 'none';
   });
@@ -104,7 +101,6 @@ function attachPlayListeners() {
     config.increment = e.target.checked;
     notifyChange();
   });
-  // Close button
   document.getElementById('closePlay').addEventListener('click', () => {
     document.getElementById('playPanel').style.display = 'none';
   });
@@ -129,6 +125,5 @@ window.addEventListener('DOMContentLoaded', () => {
     p.style.display = p.style.display === 'block' ? 'none' : 'block';
   };
 
-  // initial load
   notifyChange();
 });
