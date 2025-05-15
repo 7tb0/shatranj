@@ -1,6 +1,5 @@
 // settings.js
-// Manages rendering and interaction of Settings and Play panels
-// Exposes getConfig() and onConfigChange(callback)
+// Manages rendering and interaction of Settings and Play panels, plus piece-set selection
 
 const config = {
   theme: 'classic',
@@ -8,7 +7,7 @@ const config = {
   timer: 'none',
   increment: false,
   showGuider: false,
-  imagePrefix: ''  // '' or '1' for set1
+  imagePrefix: ''  // '' = default set, '1' = Set 1, etc.
 };
 
 const listeners = [];
@@ -41,6 +40,7 @@ function buildSettingsHTML() {
       <select id="setSelect">
         <option value="">Default</option>
         <option value="1">Set 1</option>
+        <!-- add more <option> values here for additional sets -->
       </select>
     </label>
     <label><input type="checkbox" id="guiderToggle"> Show Move Guider</label>
@@ -100,21 +100,25 @@ function attachPlayListeners() {
   });
 }
 
-// Render panels and hook toggle buttons
 window.addEventListener('DOMContentLoaded', () => {
   const settingsContainer = document.getElementById('settingsPanel');
-  const playContainer = document.getElementById('playPanel');
+  const playContainer     = document.getElementById('playPanel');
 
   settingsContainer.innerHTML = buildSettingsHTML();
-  playContainer.innerHTML = buildPlayHTML();
+  playContainer.innerHTML     = buildPlayHTML();
 
   attachSettingsListeners();
   attachPlayListeners();
 
   document.getElementById('settingsButton').onclick = () => {
-    settingsContainer.style.display = settingsContainer.style.display === 'block' ? 'none' : 'block';
+    const p = settingsContainer;
+    p.style.display = p.style.display === 'block' ? 'none' : 'block';
   };
   document.getElementById('playButton').onclick = () => {
-    playContainer.style.display = playContainer.style.display === 'block' ? 'none' : 'block';
+    const p = playContainer;
+    p.style.display = p.style.display === 'block' ? 'none' : 'block';
   };
+
+  // kick off initial notification so main.js can load with defaults
+  notifyChange();
 });
