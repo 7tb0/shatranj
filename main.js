@@ -82,6 +82,8 @@ function initBoard() {
 }
 
 // Draw the board, pieces, and UI overlays
+// At top of main.js, inside drawBoard()
+
 function drawBoard() {
   const { theme, showGuider, playMode } = getConfig();
   const themes = {
@@ -89,9 +91,34 @@ function drawBoard() {
     wood:    { light: '#d2a679', dark: '#8b5a2b' },
     dark:    { light: '#4f5b75', dark: '#2a2e38' },
     sand:    { light: '#d8c3a5', dark: '#b0906f' },
-    ice:     { light: '#e3f2fd', dark: '#90a4ae' }
+    ice:     { light: '#e3f2fd', dark: '#90a4ae' },
+    red:     { light: '#ffffff', dark: '#ffe4e1' }  // New red theme
   };
   const colors = themes[theme];
+
+  ctx.clearRect(0, 0, boardSize * squareSize, boardSize * squareSize);
+  // Squares
+  for (let y = 0; y < boardSize; y++) {
+    for (let x = 0; x < boardSize; x++) {
+      ctx.fillStyle = (x + y) % 2 === 0 ? colors.light : colors.dark;
+      ctx.fillRect(x * squareSize, y * squareSize, squareSize, squareSize);
+
+      // Red outlines for red theme
+      if (theme === 'red') {
+        ctx.strokeStyle = 'red';
+        ctx.lineWidth   = 1;
+        ctx.strokeRect(
+          x * squareSize,
+          y * squareSize,
+          squareSize,
+          squareSize
+        );
+      }
+    }
+  }
+
+  // ...rest of drawBoard remains unchanged...
+}
 
   ctx.clearRect(0, 0, boardSize * squareSize, boardSize * squareSize);
   // Squares
