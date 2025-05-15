@@ -2,18 +2,13 @@
 import { getConfig, onConfigChange } from './settings.js';
 
 let canvas, ctx;
-const boardSize = 8;
-const squareSize = 60;
-let board = [];
-let images = {};
-let selectedSquare = null;
-let turn = 'w';
-let whiteTime = 0;
-let blackTime = 0;
-let timerInterval = null;
-let gameOver = false;
+const boardSize = 8, squareSize = 60;
+let board = [], images = {};
+let selectedSquare = null, paletteSelection = null;
+let turn = 'w', whiteTime = 0, blackTime = 0;
+let timerInterval = null, gameOver = false;
 
-// 1) Initialize the canvas and click handler
+/** 1) Set up the canvas and click handler **/
 function setupCanvas() {
   canvas = document.getElementById('board');
   ctx    = canvas.getContext('2d');
@@ -26,43 +21,73 @@ function setupCanvas() {
   canvas.addEventListener('click', handleClick);
 }
 
-// 2) Preload all piece images from the single `pieces/` folder
+/** 2) Preload piece images from pieces/ with optional prefix **/
 function preloadAssets() {
   images = {};
-  const prefix = getConfig().imagePrefix || ''; // '' = default, '1' = Set1, etc.
-
-  ['R','N','E','F','K','P'].forEach(pt => {
+  const prefix = getConfig().imagePrefix || ''; // '' or '1', '2', etc.
+  ['R','N','E','F','K','P'].forEach(pt =>
     ['w','b'].forEach(color => {
-      const key = color + pt;                     // e.g. 'wR' or 'bF'
-      const filename = `${prefix}${key}.png`;     // e.g. '1wR.png' or 'bF.png'
+      const key = color + pt;               // e.g. 'wR'
+      const filename = `${prefix}${key}.png`;
       const img = new Image();
       img.onload  = drawBoard;
       img.onerror = () => console.warn(`Could not load image: pieces/${filename}`);
       img.src     = `pieces/${filename}`;
       images[key] = img;
-    });
-  });
+    })
+  );
 }
 
-// 3) Set up the initial board and timers
+/** 3) Render the piece-palette for Custom Mode **/
+function renderPalette() {
+  const pal = document.getElementById('palette');
+  if (getConfig().playMode !== 'custom') {
+    pal.style.display = 'none';
+    return;
+  }
+  pal.innerHTML = '';
+  const prefix = getConfig().imagePrefix || '';
+  ['R','N','E','F','K','P'].forEach(pt =>
+    ['w','b'].forEach(color => {
+      const key = color + pt;
+      const filename = `${prefix}${key}.png`;
+      const img = document.createElement('img');
+      img.src = `pieces/${filename}`;
+      img.className = paletteSelection === key ? 'selected' : '';
+      img.addEventListener('click', () => {
+        paletteSelection = paletteSelection === key ? null : key;
+        renderPalette();
+      });
+      pal.append(img);
+    })
+  );
+  pal.style.display = 'block';
+}
+
+/** 4) Initialize the board array, timers, and palette **/
 function initBoard() {
   const config = getConfig();
   board = Array.from({ length: boardSize }, () => Array(boardSize).fill(null));
-  selectedSquare = null;
-  turn = 'w';
-  gameOver = false;
+  selectedSquare = paletteSelection = null;
+  turn = 'w'; gameOver = false;
   document.getElementById('message').textContent = '';
 
+  // Place default pieces with White at bottom (ranks flipped)
   if (config.playMode !== 'custom') {
     const backRank = ['R','N','E','F','K','E','N','R'];
+    // Black on top
     for (let x = 0; x < boardSize; x++) {
-      board[0][x] = 'w' + backRank[x];
-      board[1][x] = 'wP';
-      board[6][x] = 'bP';
-      board[7][x] = 'b' + backRank[x];
+      board[0][x] = 'b' + backRank[x];
+      board[1][x] = 'bP';
+    }
+    // White on bottom
+    for (let x = 0; x < boardSize; x++) {
+      board[6][x] = 'wP';
+      board[7][x] = 'w' + backRank[x];
     }
   }
 
+  // Timers
   if (config.timer === 'open') {
     whiteTime = blackTime = 0;
   } else {
@@ -72,6 +97,7 @@ function initBoard() {
 
   updateTimers();
   drawBoard();
+  renderPalette();
 
   if (timerInterval) clearInterval(timerInterval);
   if (config.timer !== 'none' && config.timer !== 'open') {
@@ -82,7 +108,7 @@ function initBoard() {
   }
 }
 
-// 4) Draw board, highlights, and pieces
+/** 5) Draw the board (flipped), highlights, and pieces **/
 function drawBoard() {
   const { theme, showGuider, playMode } = getConfig();
   const themes = {
@@ -97,77 +123,80 @@ function drawBoard() {
 
   ctx.clearRect(0, 0, boardSize * squareSize, boardSize * squareSize);
 
-  // Squares
-  for (let y = 0; y < boardSize; y++) {
+  // Draw squares with flipped ranks
+  for (let ry = 0; ry < boardSize; ry++) {
+    const y = boardSize - 1 - ry;
     for (let x = 0; x < boardSize; x++) {
       const isLight = (x + y) % 2 === 0;
       ctx.fillStyle = isLight ? colors.light : colors.dark;
-      ctx.fillRect(x * squareSize, y * squareSize, squareSize, squareSize);
+      ctx.fillRect(x * squareSize, ry * squareSize, squareSize, squareSize);
       if (theme === 'red') {
         ctx.strokeStyle = 'red';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x * squareSize, y * squareSize, squareSize, squareSize);
+        ctx.lineWidth   = 2;
+        ctx.strokeRect(x * squareSize, ry * squareSize, squareSize, squareSize);
       }
     }
   }
 
-  // Move guider
-  if (selectedSquare && showGuider && playMode === 'play') {
+  // Move guider in Free or Play mode
+  if (selectedSquare && (playMode === 'free' || showGuider && playMode === 'play')) {
     ctx.fillStyle = 'rgba(0,255,0,0.3)';
-    getMoves(...selectedSquare).forEach(([mx,my]) =>
-      ctx.fillRect(mx * squareSize, my * squareSize, squareSize, squareSize)
-    );
+    getMoves(...selectedSquare).forEach(([mx,my]) => {
+      const ry = boardSize - 1 - my;
+      ctx.fillRect(mx * squareSize, ry * squareSize, squareSize, squareSize);
+    });
   }
 
   // Selection border
   if (selectedSquare) {
-    const [sx,sy] = selectedSquare;
+    const [sx, sy] = selectedSquare;
+    const ry = boardSize - 1 - sy;
     ctx.strokeStyle = 'red';
-    ctx.lineWidth = 2;
+    ctx.lineWidth   = 2;
     ctx.strokeRect(
       sx * squareSize + 2,
-      sy * squareSize + 2,
+      ry * squareSize + 2,
       squareSize - 4,
       squareSize - 4
     );
   }
 
-  // Pieces
-  ctx.textAlign = 'center';
+  // Draw pieces
+  ctx.textAlign    = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = '20px sans-serif';
+  ctx.font         = '20px sans-serif';
   for (let y = 0; y < boardSize; y++) {
     for (let x = 0; x < boardSize; x++) {
       const key = board[y][x];
       if (!key) continue;
       const img = images[key];
-      const px = x * squareSize, py = y * squareSize;
+      const ry  = boardSize - 1 - y;
+      const px  = x * squareSize, py = ry * squareSize;
       if (img && img.complete && img.naturalWidth) {
         ctx.drawImage(img, px, py, squareSize, squareSize);
       } else {
         ctx.fillStyle = 'black';
-        ctx.fillText(key, px + squareSize/2, py + squareSize/2);
+        ctx.fillText(key, px + squareSize / 2, py + squareSize / 2);
       }
     }
   }
 }
 
-// 5) Handle clicks (select & move)
+/** 6) Handle clicks: palette placement vs select/move **/
 function handleClick(e) {
   const rect = canvas.getBoundingClientRect();
-  const x = Math.floor((e.clientX - rect.left) / squareSize);
-  const y = Math.floor((e.clientY - rect.top)  / squareSize);
-  if (!isValid(x,y) || gameOver) return;
+  const rx = Math.floor((e.clientX - rect.left) / squareSize);
+  const ry = Math.floor((e.clientY - rect.top)  / squareSize);
+  const x  = rx, y = boardSize - 1 - ry;
   const config = getConfig();
 
-  // Custom mode
-  if (config.playMode === 'custom') {
-    board[y][x] = selectedSquare ? '' : board[y][x];
-    drawBoard();
-    return;
+  // Custom Mode: place/remove from palette
+  if (config.playMode === 'custom' && paletteSelection) {
+    board[y][x] = board[y][x] === paletteSelection ? null : paletteSelection;
+    drawBoard(); return;
   }
 
-  // Select
+  // Selecting a piece
   if (!selectedSquare) {
     const p = board[y][x];
     if (p && (config.playMode === 'free' || p[0] === turn)) {
@@ -177,24 +206,28 @@ function handleClick(e) {
     return;
   }
 
-  // Move
-  const [sx,sy] = selectedSquare;
-  const moves = config.playMode === 'free' ? [[x,y]] : getMoves(sx,sy);
-  if (moves.some(m=>m[0]===x&&m[1]===y)) {
+  // Moving a piece
+  const [sx, sy] = selectedSquare;
+  const moves = config.playMode === 'free'
+    ? [[x,y]]
+    : getMoves(sx, sy);
+
+  if (moves.some(m => m[0] === x && m[1] === y)) {
     board[y][x]   = board[sy][sx];
     board[sy][sx] = null;
 
-    if (config.playMode==='play'||config.playMode==='two') {
-      const enemy = turn==='w'?'b':'w';
+    if (config.playMode !== 'free') {
+      const enemy = turn === 'w' ? 'b' : 'w';
       document.getElementById('message').textContent =
         inCheck(enemy) ? 'Check!' : '';
       if (isCheckmate(enemy)) {
         gameOver = true;
         document.getElementById('message').textContent =
-          (enemy==='w'?'White':'Black')+' is checkmated!';
+          (enemy === 'w' ? 'White' : 'Black') + ' is checkmated!';
       }
       turn = enemy;
     }
+    updateTimers();
   }
 
   selectedSquare = null;
@@ -202,60 +235,69 @@ function handleClick(e) {
 }
 
 function isValid(x,y) {
-  return x>=0&&x<boardSize&&y>=0&&y<boardSize;
+  return x >= 0 && x < boardSize && y >= 0 && y < boardSize;
 }
 
-// 6) Move logic (identical to your original)
+/** 7) Generate all legal moves **/
 function getMoves(x,y,ignoreCheck=false) {
-  if (!isValid(x,y)||!board[y][x]) return [];
-  const p = board[y][x], color=p[0], t=p[1], opp=color==='w'?'b':'w';
-  let moves = [], type=t;
-  if (t==='P'&&(y===0||y===boardSize-1)) type='F';
+  if (!isValid(x,y) || !board[y][x]) return [];
+  const p    = board[y][x], color = p[0], t = p[1];
+  const opp  = color === 'w' ? 'b' : 'w';
+  let moves  = [], type = t;
 
-  if (type==='R') {
-    [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy])=>{
-      for(let i=1;i<boardSize;i++){
-        const nx=x+dx*i, ny=y+dy*i;
-        if(!isValid(nx,ny))break;
-        const o=board[ny][nx];
-        if(!o)moves.push([nx,ny]);
-        else{ if(o[0]===opp)moves.push([nx,ny]); break; }
+  // Pawn promotion type
+  if (t === 'P' && (y === 0 || y === boardSize-1)) type = 'F';
+
+  // Rook
+  if (type === 'R') {
+    [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy]) => {
+      for (let i=1;i<boardSize;i++){
+        const nx = x+dx*i, ny = y+dy*i;
+        if (!isValid(nx,ny)) break;
+        const o = board[ny][nx];
+        if (!o) moves.push([nx,ny]);
+        else { if (o[0] === opp) moves.push([nx,ny]); break; }
       }
     });
   }
 
+  // Bishop-like, Elephant, Knight, King
   const defs = {
-    E:{dirs:[[1,1],[1,-1],[-1,1],[-1,-1]],step:2},
-    F:{dirs:[[1,1],[1,-1],[-1,1],[-1,-1]],step:1},
-    N:{dirs:[[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]],step:1},
-    K:{dirs:[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]],step:1}
+    E: { dirs:[[1,1],[1,-1],[-1,1],[-1,-1]], step:2 },
+    F: { dirs:[[1,1],[1,-1],[-1,1],[-1,-1]], step:1 },
+    N: { dirs:[[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]], step:1 },
+    K: { dirs:[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]], step:1 }
   };
-  if(defs[type])defs[type].dirs.forEach(([dx,dy])=>{
-    const nx=x+dx*defs[type].step, ny=y+dy*defs[type].step;
-    if(isValid(nx,ny)){
-      const o=board[ny][nx];
-      if(!o||o[0]===opp)moves.push([nx,ny]);
-    }
-  });
+  if (defs[type]) {
+    defs[type].dirs.forEach(([dx,dy]) => {
+      const nx = x + dx * defs[type].step, ny = y + dy * defs[type].step;
+      if (isValid(nx,ny)) {
+        const o = board[ny][nx];
+        if (!o || o[0] === opp) moves.push([nx,ny]);
+      }
+    });
+  }
 
-  if(t==='P'){
-    const dir=color==='w'?1:-1;
-    if(isValid(x,y+dir)&&!board[y+dir][x])moves.push([x,y+dir]);
-    [[1,dir],[-1,dir]].forEach(([dx,dy])=>{
-      const cx=x+dx, cy=y+dy;
-      if(isValid(cx,cy)&&board[cy][cx]&&board[cy][cx][0]===opp)
+  // Pawn moves & captures
+  if (t === 'P') {
+    const dir = color === 'w' ? 1 : -1;
+    if (isValid(x,y+dir) && !board[y+dir][x]) moves.push([x,y+dir]);
+    [[1,dir],[-1,dir]].forEach(([dx,dy]) => {
+      const cx = x+dx, cy = y+dy;
+      if (isValid(cx,cy) && board[cy][cx] && board[cy][cx][0] === opp)
         moves.push([cx,cy]);
     });
   }
 
-  if(!ignoreCheck&&getConfig().playMode==='play'){
-    moves = moves.filter(([mx,my])=>{
-      const backup=board[my][mx];
-      board[my][mx]=board[y][x];
-      board[y][x]=null;
-      const bad=inCheck(color);
-      board[y][x]=board[my][mx];
-      board[my][mx]=backup;
+  // Filter out moves that leave king in check
+  if (!ignoreCheck && getConfig().playMode === 'play') {
+    moves = moves.filter(([mx,my]) => {
+      const backup = board[my][mx];
+      board[my][mx] = board[y][x];
+      board[y][x] = null;
+      const bad = inCheck(color);
+      board[y][x] = board[my][mx];
+      board[my][mx] = backup;
       return !bad;
     });
   }
@@ -263,15 +305,16 @@ function getMoves(x,y,ignoreCheck=false) {
   return moves;
 }
 
-function inCheck(color){
-  const opp=color==='w'?'b':'w';
+/** 8) Check and Checkmate detection **/
+function inCheck(color) {
+  const opp = color === 'w' ? 'b' : 'w';
   let kpos;
-  board.forEach((r,y)=>r.forEach((c,x)=>{if(c===color+'K')kpos=[x,y]}));
-  for(let y=0;y<boardSize;y++){
-    for(let x=0;x<boardSize;x++){
-      const p=board[y][x];
-      if(p&&p[0]===opp){
-        if(getMoves(x,y,true).some(m=>m[0]===kpos[0]&&m[1]===kpos[1]))
+  board.forEach((r,ry) => r.forEach((c,rx)=>{ if (c === color+'K') kpos=[rx,ry]; }));
+  for (let y=0;y<boardSize;y++) {
+    for (let x=0;x<boardSize;x++) {
+      const p = board[y][x];
+      if (p && p[0] === opp) {
+        if (getMoves(x,y,true).some(m=>m[0]===kpos[0]&&m[1]===kpos[1]))
           return true;
       }
     }
@@ -279,53 +322,68 @@ function inCheck(color){
   return false;
 }
 
-function isCheckmate(color){
-  if(!inCheck(color))return false;
-  for(let y=0;y<boardSize;y++){
-    for(let x=0;x<boardSize;x++){
-      const p=board[y][x];
-      if(!p||p[0]!==color)continue;
-      for(const [mx,my] of getMoves(x,y)){
-        const backup=board[my][mx];
-        board[my][mx]=board[y][x]; board[y][x]=null;
-        if(!inCheck(color)){
-          board[y][x]=board[my][mx]; board[my][mx]=backup;
+function isCheckmate(color) {
+  if (!inCheck(color)) return false;
+  for (let y=0;y<boardSize;y++) {
+    for (let x=0;x<boardSize;x++) {
+      const p = board[y][x];
+      if (!p || p[0] !== color) continue;
+      for (const [mx,my] of getMoves(x,y)) {
+        const backup = board[my][mx];
+        board[my][mx] = board[y][x]; board[y][x] = null;
+        if (!inCheck(color)) {
+          board[y][x] = board[my][mx]; board[my][mx] = backup;
           return false;
         }
-        board[y][x]=board[my][mx]; board[my][mx]=backup;
+        board[y][x] = board[my][mx]; board[my][mx] = backup;
       }
     }
   }
   return true;
 }
 
-// 7) Timers
-function updateTimers(){
+/** 9) Timers **/
+function updateTimers() {
   const { timer } = getConfig();
-  const wt = document.getElementById('whiteTimer');
-  const bt = document.getElementById('blackTimer');
-  if(timer==='none'){
-    document.getElementById('timers').style.display='none';
+  const wt = document.getElementById('whiteTimer'),
+        bt = document.getElementById('blackTimer');
+  if (timer === 'none') {
+    document.getElementById('timers').style.display = 'none';
     return;
   }
-  document.getElementById('timers').style.display='flex';
-  wt.textContent = 'White: '+formatTime(whiteTime);
-  bt.textContent = 'Black: '+formatTime(blackTime);
+  document.getElementById('timers').style.display = 'flex';
+  wt.textContent = 'White: ' + formatTime(whiteTime);
+  bt.textContent = 'Black: ' + formatTime(blackTime);
 }
 
-function formatTime(s){
-  const m=Math.floor(s/60), sec=s%60;
+function formatTime(s) {
+  const m = Math.floor(s/60), sec = s%60;
   return m.toString().padStart(2,'0')+':'+sec.toString().padStart(2,'0');
 }
 
-// 8) React to settings changes
-onConfigChange(()=>{
+/** 10) Play panel Start button & panel toggles **/
+document.getElementById('startButton').onclick = () => {
+  initBoard();
+  document.getElementById('playPanel').style.display = 'none';
+};
+
+document.getElementById('playButton').onclick     = () => toggle('playPanel');
+document.getElementById('settingsButton').onclick = () => toggle('settingsPanel');
+document.getElementById('closePlay').onclick      = () => toggle('playPanel');
+
+function toggle(id) {
+  const p = document.getElementById(id);
+  p.style.display = p.style.display === 'block' ? 'none' : 'block';
+}
+
+/** 11) React to settings changes **/
+onConfigChange(() => {
   preloadAssets();
   initBoard();
 });
 
-// 9) Initial load
-window.addEventListener('DOMContentLoaded',()=>{
+/** 12) Initial load **/
+window.addEventListener('DOMContentLoaded', () => {
   setupCanvas();
   preloadAssets();
   initBoard();
