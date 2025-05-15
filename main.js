@@ -26,26 +26,26 @@ function setupCanvas() {
   canvas.addEventListener('click', handleClick);
 }
 
-// Load piece images with optional prefix
+// Load piece images from pieces/ folder with optional prefix
 function preloadAssets() {
   images = {};
   const { imagePrefix } = getConfig();
-  const prefix = imagePrefix
-    ? `pieces/set${imagePrefix}/`
-    : 'pieces/';
+  const prefix = imagePrefix || ''; // '' for default, '1' for Set 1, etc.
+
   ['R','N','E','F','K','P'].forEach(pt => {
     ['w','b'].forEach(color => {
-      const key = color + pt;
+      const key = color + pt;                 // e.g. 'wR', 'bF'
+      const filename = `${prefix}${key}.png`; // e.g. '1wR.png' or 'bF.png'
       const img = new Image();
       img.onload = drawBoard;
-      img.onerror = () => console.warn(`Could not load image: ${prefix}${key}.png`);
-      img.src = `${prefix}${key}.png`;
+      img.onerror = () => console.warn(`Could not load image: pieces/${filename}`);
+      img.src = `pieces/${filename}`;
       images[key] = img;
     });
   });
 }
 
-// Set up board array and timers
+// Initialize board array and timers
 function initBoard() {
   const config = getConfig();
   board = Array.from({ length: boardSize }, () => Array(boardSize).fill(null));
@@ -83,7 +83,7 @@ function initBoard() {
   }
 }
 
-// Draw the board, pieces, and UI overlays
+// Draw the board, pieces, and overlays
 function drawBoard() {
   const { theme, showGuider, playMode } = getConfig();
   const themes = {
@@ -98,7 +98,7 @@ function drawBoard() {
 
   ctx.clearRect(0, 0, boardSize * squareSize, boardSize * squareSize);
 
-  // Draw squares
+  // Squares
   for (let y = 0; y < boardSize; y++) {
     for (let x = 0; x < boardSize; x++) {
       const isLight = (x + y) % 2 === 0;
@@ -112,7 +112,7 @@ function drawBoard() {
     }
   }
 
-  // Move guider overlay
+  // Move guider
   if (selectedSquare && showGuider && playMode === 'play') {
     ctx.fillStyle = 'rgba(0,255,0,0.3)';
     getMoves(...selectedSquare).forEach(([mx, my]) => {
@@ -133,7 +133,7 @@ function drawBoard() {
     );
   }
 
-  // Draw pieces
+  // Pieces
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.font = '20px sans-serif';
@@ -153,7 +153,7 @@ function drawBoard() {
   }
 }
 
-// Handle player's click
+// Click handler
 function handleClick(e) {
   const rect = canvas.getBoundingClientRect();
   const x = Math.floor((e.clientX - rect.left) / squareSize);
@@ -161,14 +161,14 @@ function handleClick(e) {
   if (!isValid(x, y) || gameOver) return;
   const config = getConfig();
 
-  // Custom mode: erase
+  // Custom mode: draw/erase
   if (config.playMode === 'custom') {
     board[y][x] = selectedSquare ? '' : board[y][x];
     drawBoard();
     return;
   }
 
-  // Selecting a piece
+  // Select
   if (!selectedSquare) {
     const p = board[y][x];
     if (p && (config.playMode === 'free' || p[0] === turn)) {
@@ -178,17 +178,13 @@ function handleClick(e) {
     return;
   }
 
-  // Moving a piece
+  // Move
   const [sx, sy] = selectedSquare;
-  const moves = config.playMode === 'free'
-    ? [[x, y]]
-    : getMoves(sx, sy);
-
+  const moves = config.playMode === 'free' ? [[x,y]] : getMoves(sx, sy);
   if (moves.some(m => m[0] === x && m[1] === y)) {
     board[y][x] = board[sy][sx];
     board[sy][sx] = null;
 
-    // Check / checkmate / turn swap
     if (config.playMode === 'play' || config.playMode === 'two') {
       const enemy = turn === 'w' ? 'b' : 'w';
       if (inCheck(enemy)) {
@@ -213,60 +209,58 @@ function isValid(x, y) {
   return x >= 0 && x < boardSize && y >= 0 && y < boardSize;
 }
 
-// Generate legal moves
 function getMoves(x, y, ignoreCheck = false) {
   if (!isValid(x, y) || !board[y][x]) return [];
   const p = board[y][x], color = p[0], t = p[1], opp = color === 'w' ? 'b' : 'w';
   let moves = [], type = t;
-  if (t === 'P' && (y === 0 || y === boardSize - 1)) type = 'F';
+  if (t === 'P' && (y === 0 || y === boardSize-1)) type = 'F';
 
+  // Rook-like
   if (type === 'R') {
     [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy]) => {
-      for (let i = 1; i < boardSize; i++) {
-        const nx = x + dx*i, ny = y + dy*i;
-        if (!isValid(nx, ny)) break;
-        const o = board[ny][nx];
-        if (!o) moves.push([nx, ny]);
-        else { if (o[0] === opp) moves.push([nx, ny]); break; }
+      for (let i=1; i<boardSize; i++) {
+        const nx=x+dx*i, ny=y+dy*i;
+        if (!isValid(nx,ny)) break;
+        const o=board[ny][nx];
+        if (!o) moves.push([nx,ny]);
+        else { if(o[0]===opp) moves.push([nx,ny]); break; }
       }
     });
   }
 
+  // Bishop/elephant, knight, king
   const defs = {
-    E: { dirs: [[1,1],[1,-1],[-1,1],[-1,-1]], step: 2 },
-    F: { dirs: [[1,1],[1,-1],[-1,1],[-1,-1]], step: 1 },
-    N: { dirs: [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]], step:1 },
-    K: { dirs: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]], step:1 }
+    E: { dirs:[[1,1],[1,-1],[-1,1],[-1,-1]], step:2 },
+    F: { dirs:[[1,1],[1,-1],[-1,1],[-1,-1]], step:1 },
+    N: { dirs:[[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]], step:1 },
+    K: { dirs:[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]], step:1 }
   };
-  if (defs[type]) {
-    defs[type].dirs.forEach(([dx,dy]) => {
-      const nx = x + dx*defs[type].step, ny = y + dy*defs[type].step;
-      if (isValid(nx, ny)) {
-        const o = board[ny][nx];
-        if (!o || o[0] === opp) moves.push([nx, ny]);
-      }
+  if(defs[type]) defs[type].dirs.forEach(([dx,dy])=>{
+    const nx=x+dx*defs[type].step, ny=y+dy*defs[type].step;
+    if(isValid(nx,ny)){
+      const o=board[ny][nx];
+      if(!o||o[0]===opp) moves.push([nx,ny]);
+    }
+  });
+
+  // Pawn
+  if(t==='P'){
+    const dir=color==='w'?1:-1;
+    if(isValid(x,y+dir)&&!board[y+dir][x]) moves.push([x,y+dir]);
+    [[1,dir],[-1,dir]].forEach(([dx,dy])=>{
+      const cx=x+dx, cy=y+dy;
+      if(isValid(cx,cy)&&board[cy][cx]&&board[cy][cx][0]===opp)
+        moves.push([cx,cy]);
     });
   }
 
-  if (t === 'P') {
-    const dir = color === 'w' ? 1 : -1;
-    const nx = x, ny = y + dir;
-    if (isValid(nx, ny) && !board[ny][nx]) moves.push([nx, ny]);
-    [[1,dir],[-1,dir]].forEach(([dx,dy]) => {
-      const cx = x + dx, cy = y + dy;
-      if (isValid(cx, cy) && board[cy][cx] && board[cy][cx][0] === opp)
-        moves.push([cx, cy]);
-    });
-  }
-
-  if (!ignoreCheck && getConfig().playMode === 'play') {
-    moves = moves.filter(([mx, my]) => {
-      const backup = board[my][mx];
-      board[my][mx] = board[y][x];
-      board[y][x] = null;
-      const bad = inCheck(color);
-      board[y][x] = board[my][mx];
-      board[my][mx] = backup;
+  // Filter moves leaving king in check
+  if(!ignoreCheck && getConfig().playMode==='play'){
+    moves = moves.filter(([mx,my])=>{
+      const backup=board[my][mx];
+      board[my][mx]=board[y][x]; board[y][x]=null;
+      const bad=inCheck(color);
+      board[y][x]=board[my][mx]; board[my][mx]=backup;
       return !bad;
     });
   }
@@ -274,74 +268,68 @@ function getMoves(x, y, ignoreCheck = false) {
   return moves;
 }
 
-function inCheck(color) {
-  const opp = color === 'w' ? 'b' : 'w';
+function inCheck(color){
+  const opp=color==='w'?'b':'w';
   let kpos;
-  board.forEach((row,y) =>
-    row.forEach((c,x) => { if (c === color+'K') kpos=[x,y]; })
-  );
-  for (let y = 0; y < boardSize; y++) {
-    for (let x = 0; x < boardSize; x++) {
-      const p = board[y][x];
-      if (p && p[0] === opp) {
-        if (getMoves(x, y, true).some(m =>
-          m[0] === kpos[0] && m[1] === kpos[1]
-        )) return true;
+  board.forEach((r,y)=>r.forEach((c,x)=>{if(c===color+'K')kpos=[x,y]}));
+  for(let y=0;y<boardSize;y++){
+    for(let x=0;x<boardSize;x++){
+      const p=board[y][x];
+      if(p&&p[0]===opp){
+        if(getMoves(x,y,true).some(m=>m[0]===kpos[0]&&m[1]===kpos[1]))
+          return true;
       }
     }
   }
   return false;
 }
 
-function isCheckmate(color) {
-  if (!inCheck(color)) return false;
-  for (let y = 0; y < boardSize; y++) {
-    for (let x = 0; x < boardSize; x++) {
-      const p = board[y][x];
-      if (!p || p[0] !== color) continue;
-      for (const [mx,my] of getMoves(x, y)) {
-        const backup = board[my][mx];
-        board[my][mx] = board[y][x];
-        board[y][x] = null;
-        if (!inCheck(color)) {
-          board[y][x] = board[my][mx];
-          board[my][mx] = backup;
+function isCheckmate(color){
+  if(!inCheck(color))return false;
+  for(let y=0;y<boardSize;y++){
+    for(let x=0;x<boardSize;x++){
+      const p=board[y][x];
+      if(!p||p[0]!==color)continue;
+      for(const [mx,my] of getMoves(x,y)){
+        const backup=board[my][mx];
+        board[my][mx]=board[y][x]; board[y][x]=null;
+        if(!inCheck(color)){
+          board[y][x]=board[my][mx]; board[my][mx]=backup;
           return false;
         }
-        board[y][x] = board[my][mx];
-        board[my][mx] = backup;
+        board[y][x]=board[my][mx]; board[my][mx]=backup;
       }
     }
   }
   return true;
 }
 
-function updateTimers() {
-  const { timer } = getConfig();
-  const wt = document.getElementById('whiteTimer');
-  const bt = document.getElementById('blackTimer');
-  if (timer === 'none') {
-    document.getElementById('timers').style.display = 'none';
+function updateTimers(){
+  const { timer }=getConfig();
+  const wt=document.getElementById('whiteTimer');
+  const bt=document.getElementById('blackTimer');
+  if(timer==='none'){
+    document.getElementById('timers').style.display='none';
     return;
   }
-  document.getElementById('timers').style.display = 'flex';
-  wt.textContent = 'White: ' + formatTime(whiteTime);
-  bt.textContent = 'Black: ' + formatTime(blackTime);
+  document.getElementById('timers').style.display='flex';
+  wt.textContent='White: '+formatTime(whiteTime);
+  bt.textContent='Black: '+formatTime(blackTime);
 }
 
-function formatTime(s) {
-  const m = Math.floor(s/60), sec = s % 60;
-  return m.toString().padStart(2,'0') + ':' + sec.toString().padStart(2,'0');
+function formatTime(s){
+  const m=Math.floor(s/60), sec=s%60;
+  return m.toString().padStart(2,'0')+':'+sec.toString().padStart(2,'0');
 }
 
 // React to settings changes
-onConfigChange(() => {
+onConfigChange(()=>{
   preloadAssets();
   initBoard();
 });
 
 // Initial load
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded',()=>{
   setupCanvas();
   preloadAssets();
   initBoard();
