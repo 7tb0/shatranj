@@ -6,11 +6,11 @@ export let images = {};
 export function preloadAssets(drawBoardCallback) {
   images = {};
   const { imagePrefix } = getConfig();
-  // Always look in the pieces/ folder; if the user selected a set number, use pieces/setX/
+  // Always look in pieces/; if the user picked “1”, go into pieces/set1/
   const basePath = imagePrefix
     ? `pieces/set${imagePrefix}/`
     : 'pieces/';
-  
+
   ['R','N','E','F','K','P'].forEach(pt => {
     ['w','b'].forEach(color => {
       const key = color + pt;
